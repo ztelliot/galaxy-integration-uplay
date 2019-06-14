@@ -21,6 +21,9 @@ def is_steam_installed():
 
 
 def get_steam_game_status(path):
+    if not path:
+        return GameStatus.NotInstalled
+
     reg_path = path
     index = reg_path.lower().find("software")
     end = reg_path.lower().find("installed")

@@ -497,11 +497,13 @@ class LocalParser(object):
         if 'third_party_platform' in game_yaml['root']:
             if game_yaml['root']['third_party_platform']['name'].lower() == 'steam':
                 game_type = GameType.Steam
-                path = game_yaml['root']['start_game']['steam']['game_installation_status_register']
+                if 'third_party_steam' in game_yaml['root']['start_game']:
+                    path = game_yaml['root']['start_game']['third_party_steam']['game_installation_status_register']
+                    third_party_id = game_yaml['root']['start_game']['third_party_steam']['steam_app_id']
+                elif 'steam' in game_yaml['root']['start_game']:
+                    path = game_yaml['root']['start_game']['steam']['game_installation_status_register']
+                    third_party_id = game_yaml['root']['start_game']['steam']['steam_app_id']
                 status = get_steam_game_status(path)
-                if 'start_game' in game_yaml['root']:
-                    if 'steam' in game_yaml['root']['start_game']:
-                        third_party_id = game_yaml['root']['start_game']['steam']['steam_app_id']
             elif game_yaml['root']['third_party_platform']['name'].lower() == 'origin':
                 game_type = GameType.Origin
                 path = game_yaml['root']['third_party_platform']['platform_installation_status']['register']

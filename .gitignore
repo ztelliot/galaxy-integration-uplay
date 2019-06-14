@@ -1,0 +1,18 @@
+# auto-generated files
+**/__pycache__
+.pytest_cache
+build/
+output/
+credentials.data
+webrtc_event_logs
+blob_storage
+plugin-uplay.spec
+
+# developement stuff
+venv
+.DS_Store
+.vscode
+.idea
+Pipfile
+# everyone has its own dev.txt to keep own dependencies
+requirements/dev.txt

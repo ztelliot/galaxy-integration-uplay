@@ -1,22 +1,18 @@
-import asyncio
 from datetime import datetime
-import functools
-import requests
 import logging as log
-from http import HTTPStatus
+from galaxy.http import HttpClient
 import dateutil.parser
 
 from galaxy.api.errors import (
-    UnknownError, BackendNotAvailable, BackendError, AccessDenied
+    AuthenticationRequired, AccessDenied
 )
 
 from consts import CLUB_APPID, CHROME_USERAGENT
 
 
-class BackendClient(object):
+class BackendClient(HttpClient):
     def __init__(self, plugin):
         self._plugin = plugin
-        self.session = requests.Session()
         self._auth_lost_callback = None
         self.token = None
         self.session_id = None
@@ -24,6 +20,13 @@ class BackendClient(object):
         self.refresh_time = None
         self.user_id = None
         self.__refresh_in_progress = False
+        super().__init__()
+        self._session.headers = {
+            'Authorization': None,
+            'Ubi-AppId': CLUB_APPID,
+            "User-Agent": CHROME_USERAGENT,
+            'Ubi-SessionId': None
+        }
 
     def set_auth_lost_callback(self, callback):
         self._auth_lost_callback = callback
@@ -31,32 +34,24 @@ class BackendClient(object):
     def is_authenticated(self):
         return self.token is not None
 
-    async def _do_request(self, method, url, *args, **kwargs):
-        loop = asyncio.get_running_loop()
-        r = await loop.run_in_executor(None, functools.partial(self.session.request, method, url, *args, **kwargs))
-        log.info(f"{r.status_code}: response from endpoint {url}")
-
-        if r.status_code in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
-            raise AccessDenied()
-        if r.status_code == HTTPStatus.SERVICE_UNAVAILABLE:
-            raise BackendNotAvailable()
-        if r.status_code >= 500:
-            raise BackendError()
-        if r.status_code >= 400:
-            raise UnknownError()
-        
-        j = r.json()  # all ubi endpoints return jsons
+    async def _do_request(self, method, *args, **kwargs):
+        if not kwargs:
+            log.info("Kwargs empty, using session headers")
+            kwargs['headers'] = self._session.headers
+        r = await super().request(method, *args, **kwargs)
+        j = await r.json()  # all ubi endpoints return jsons
+        log.info(f"Response status: {r}")
         return j
 
-    async def _do_request_safe(self, method, url, *args, **kwargs):
+    async def _do_request_safe(self, method, *args, **kwargs):
 
         async def _refresh_and_request():
             await self._refresh_ticket()
-            return await self._do_request(method, url, *args, **kwargs)
+            return await self._do_request(method, *args, **kwargs)
         
         if self.__refresh_in_progress:
-            log.info(f'Refreshing already in progress. Calling to {url} without refresh')
-            return await self._do_request(method, url, *args, **kwargs)
+            log.info(f'Refreshing already in progress. Calling url without refresh')
+            return await self._do_request(method, *args, **kwargs)
 
         self.__refresh_in_progress = True
         result = {}
@@ -64,7 +59,7 @@ class BackendClient(object):
             if not self.refresh_token:
                 result = await _refresh_and_request()
             else:
-                log.debug('rememberMeTicket expiration time: ' + str(self.refresh_time))
+                log.debug(f'rememberMeTicket expiration time: {str(self.refresh_time)}')
                 refresh_needed = self.refresh_time is None or datetime.now() > datetime.fromtimestamp(int(self.refresh_time))
                 if refresh_needed:
                     await self._refresh_remember_me()
@@ -72,12 +67,13 @@ class BackendClient(object):
                 else:
                     try:
                         result = await _refresh_and_request()
-                    except AccessDenied:
+                    except (AccessDenied, AuthenticationRequired):
                         # fallback for another reason than expired time or wrong calculation due to changing time zones
                         log.debug('Fallback refresh')
                         await self._refresh_remember_me()
                         result = await _refresh_and_request()
-        except AccessDenied:
+        except (AccessDenied, AuthenticationRequired) as e:
+            log.debug(f"Unable to refresh authentication calling auth lost: {repr(e)}")
             if self._auth_lost_callback:
                 self._auth_lost_callback()
             raise
@@ -90,7 +86,6 @@ class BackendClient(object):
             self.__refresh_in_progress = False
 
         return result
-
 
     async def _do_options_request(self):
         await self._do_request('options', "https://public-ubiservices.ubi.com/v3/profiles/sessions", headers={
@@ -154,11 +149,12 @@ class BackendClient(object):
         if data.get('rememberMeTicket'):
             self.refresh_token = data['rememberMeTicket']
 
-        self.session.headers = {
+        self._session.headers = {
             'Ubi-AppId': CLUB_APPID,
             "Authorization": f"Ubi_v1 t={self.token}",
             "Ubi-SessionId": self.session_id
         }
+        self._plugin.store_credentials(self.get_credentials())
 
     def get_credentials(self):
         return {
@@ -172,7 +168,6 @@ class BackendClient(object):
     async def authorise_with_stored_credentials(self, credentials):
         self.restore_credentials(credentials)
         user_data = await self.get_user_data()
-        self._plugin.store_credentials(self.get_credentials())
         await self.post_sessions()
         return user_data
     
@@ -202,18 +197,18 @@ class BackendClient(object):
     async def get_game_stats(self, space_id):
         url = f"https://public-ubiservices.ubi.com/v1/profiles/{self.user_id}/statscard?spaceId={space_id}&offset=0"
         headers = {
-            "Authorization": f"Ubi_v1 t={self.token}",
+            "Authorization": f"Ubi_v1 t={self._session.headers['Authorization']}",
             "Origin": "https://connect.ubisoft.com",
             "Referer": "https://connect.ubisoft.com/indexOverlay.html?owner=https://uplay.ubisoft.com",
             "Ubi-AppId": CLUB_APPID,
             "Ubi-RequestedPlatformType": "uplay",
             "Ubi-LocaleCode": "en-GB",
-            "Ubi-SessionId": self.session_id,
+            "Ubi-SessionId": self._session.headers['Ubi-SessionId'],
             "User-Agent": CHROME_USERAGENT,
         }
         try:
             j = await self._do_request('get', url, headers=headers)
-        except UnknownError:  # 404 - no stats available
+        except AuthenticationRequired:  # 404 - no stats available for this user
             return {}
         return j
 
@@ -231,7 +226,7 @@ class BackendClient(object):
         return r.json()
 
     async def post_sessions(self):
-        h = self.session.headers
+        h = self._session.headers
         h['Content-Type'] = 'application/json'
         j = await self._do_request_safe('post', f"https://public-ubiservices.ubi.com/v2/profiles/sessions", headers=h)
         return j

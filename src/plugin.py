@@ -9,8 +9,9 @@ import dateutil.parser
 
 
 from galaxy.api.consts import Platform
-from galaxy.api.errors import InvalidCredentials, AccessDenied, AuthenticationRequired
-from galaxy.api.jsonrpc import Aborted
+from galaxy.api.jsonrpc import ApplicationError
+from galaxy.api.errors import InvalidCredentials, AuthenticationRequired, AccessDenied
+
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo
 
@@ -47,11 +48,12 @@ class UplayPlugin(Plugin):
         else:
             try:
                 user_data = await self.client.authorise_with_stored_credentials(stored_credentials)
-            except AccessDenied:
+            except (AccessDenied, AuthenticationRequired) as e:
+                log.exception(repr(e))
                 raise InvalidCredentials()
             except Exception as e:
                 log.exception(repr(e))
-                raise Aborted()  # for sure this should be raised?
+                raise e
             else:
                 self.local_client.initialize(user_data['userId'])
                 self.client.set_auth_lost_callback(self.auth_lost)
@@ -106,6 +108,9 @@ class UplayPlugin(Plugin):
                                 ))
 
                 self.games_collection.append(club_games)
+            except ApplicationError as e:
+                log.error(f"Encountered exception while parsing club games {repr(e)}")
+                raise e
             except Exception as e:
                 log.error(f"Encountered exception while parsing club games {repr(e)}")
             finally:
@@ -208,6 +213,9 @@ class UplayPlugin(Plugin):
                 log.info(f'Stats for {game.name}: playtime: {playtime}, last_played: {last_played}')
                 if playtime is not None and last_played is not None:
                     game_times.append(GameTime(game.space_id, playtime, last_played))
+        except ApplicationError as e:
+            log.exception("Game times:" + repr(e))
+            raise e
         except Exception as e:
             log.exception("Game times:" + repr(e))
         finally:
@@ -350,6 +358,11 @@ class UplayPlugin(Plugin):
                         log.info('Ownership file has been changed or created. Reparsing.')
                         loop.run_in_executor(None, self._update_games)
         return
+
+
+    def shutdown(self):
+        log.info("Plugin shutdown.")
+        asyncio.create_task(self.client.close())
 
 
 def main():

@@ -113,7 +113,9 @@ class LocalClient(object):
         self.refresh()
 
     def initialize(self, user_id):
-        log.info('Setting user id:' + user_id)
+        if not user_id:
+            log.warning("Initialized with null user id!")
+        log.info('Setting user id')
         self.user_id = user_id
         self.refresh()
         # Start tracking ownership file if exists

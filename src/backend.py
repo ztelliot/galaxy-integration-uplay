@@ -4,7 +4,7 @@ from galaxy.http import HttpClient
 import dateutil.parser
 
 from galaxy.api.errors import (
-    AuthenticationRequired, AccessDenied
+    AuthenticationRequired, AccessDenied, UnknownError
 )
 
 from consts import CLUB_APPID, CHROME_USERAGENT
@@ -35,9 +35,14 @@ class BackendClient(HttpClient):
         return self.token is not None
 
     async def _do_request(self, method, *args, **kwargs):
-        if not kwargs:
-            log.info("Kwargs empty, using session headers")
+        if not kwargs or 'headers' not in kwargs:
+            log.info("No headers in kwargs, using session headers")
             kwargs['headers'] = self._session.headers
+        if 'add_to_headers' in kwargs:
+            for header in kwargs['add_to_headers']:
+                kwargs['headers'][header] = kwargs['add_to_headers'][header]
+            kwargs.pop('add_to_headers')
+
         r = await super().request(method, *args, **kwargs)
         j = await r.json()  # all ubi endpoints return jsons
         log.info(f"Response status: {r}")
@@ -195,20 +200,14 @@ class BackendClient(HttpClient):
         return await self._do_request_safe('get', "https://public-ubiservices.ubi.com/v1/profiles/me/club/aggregation/website/games/owned")
 
     async def get_game_stats(self, space_id):
-        url = f"https://public-ubiservices.ubi.com/v1/profiles/{self.user_id}/statscard?spaceId={space_id}&offset=0"
-        headers = {
-            "Authorization": f"Ubi_v1 t={self._session.headers['Authorization']}",
-            "Origin": "https://connect.ubisoft.com",
-            "Referer": "https://connect.ubisoft.com/indexOverlay.html?owner=https://uplay.ubisoft.com",
-            "Ubi-AppId": CLUB_APPID,
-            "Ubi-RequestedPlatformType": "uplay",
-            "Ubi-LocaleCode": "en-GB",
-            "Ubi-SessionId": self._session.headers['Ubi-SessionId'],
-            "User-Agent": CHROME_USERAGENT,
-        }
+        url = f"https://public-ubiservices.ubi.com/v1/profiles/{self.user_id}/statscard?spaceId={space_id}"
+        headers = {}
+        headers['Ubi-RequestedPlatformType'] = "uplay"
+        headers['Ubi-LocaleCode'] = "en-GB"
+
         try:
-            j = await self._do_request('get', url, headers=headers)
-        except AuthenticationRequired:  # 404 - no stats available for this user
+            j = await self._do_request('get', url, add_to_headers=headers)
+        except UnknownError:  # no stats available for this user
             return {}
         return j
 
@@ -226,7 +225,7 @@ class BackendClient(HttpClient):
         return r.json()
 
     async def post_sessions(self):
-        h = self._session.headers
-        h['Content-Type'] = 'application/json'
-        j = await self._do_request_safe('post', f"https://public-ubiservices.ubi.com/v2/profiles/sessions", headers=h)
+        headers = {}
+        headers['Content-Type'] = 'application/json'
+        j = await self._do_request_safe('post', f"https://public-ubiservices.ubi.com/v2/profiles/sessions", add_to_headers=headers)
         return j

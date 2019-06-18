@@ -17,6 +17,7 @@ class GamesCollection(list):
 
         for game in games:
             if game.space_id not in spaces and game.launch_id not in launches:
+                log.info(f"Adding new game to games collection {game.name} with space_id: {game.space_id} and lauch_id: {game.launch_id}")
                 super().append(game)
                 continue
             if game.space_id in spaces or game.launch_id in launches:

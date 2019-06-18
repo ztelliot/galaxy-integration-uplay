@@ -29,19 +29,6 @@ def test_new_game_not_owned(create_authenticated_plugin):
     pg.add_game.assert_not_called()
 
 
-def test_new_game_glitched(create_authenticated_plugin):
-    loop = asyncio.get_event_loop()
-    pg = create_authenticated_plugin()
-
-    new_game = NewGame()
-
-    pg._game_ownership_is_glitched.return_value = True
-
-    loop.run_until_complete(pg._add_new_games([new_game]))
-
-    pg.add_game.assert_not_called()
-
-
 def test_new_game_empty_list(create_authenticated_plugin):
     loop = asyncio.get_event_loop()
     pg = create_authenticated_plugin()

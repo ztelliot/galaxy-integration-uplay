@@ -72,6 +72,7 @@ class UplayPlugin(Plugin):
 
         self._parse_local_games()
         self._parse_local_game_ownership()
+
         await self._parse_club_games()
 
         self.owned_games_sent = True
@@ -80,7 +81,7 @@ class UplayPlugin(Plugin):
             game.considered_for_sending = True
 
         return [game.as_galaxy_game() for game in self.games_collection
-                if not self._game_ownership_is_glitched(game) and game.owned]
+                if game.owned]
 
     async def _parse_club_games(self):
         if not self.parsing_club_games:
@@ -181,20 +182,11 @@ class UplayPlugin(Plugin):
         self._update_local_games_status()
         return local_games
 
-    def _game_ownership_is_glitched(self, game):
-        """" If we have access to local configuration files we can determine whether the game is glitched
-        for example is reported by the uplay club as owned but is not recognized so by the client. """
-        if self.local_client.configurations_accessible():
-            if not game.launch_id:
-                return True
-        # No local files present, cant determine
-        return False
-
     async def _add_new_games(self, games):
         await self._parse_club_games()
         self._parse_local_game_ownership()
         for game in games:
-            if not self._game_ownership_is_glitched(game) and game.owned:
+            if game.owned:
                 self.add_game(game.as_galaxy_game())
 
     async def get_game_times(self):

@@ -14,6 +14,7 @@ class NewGame(object):
 
     space_id: str = "123"
     launch_id: str = "321"
+    install_id: str = "321"
     third_party_id: str = ""
     name: str = "UbiGame"
     path: str = ""
@@ -63,3 +64,7 @@ def create_authenticated_plugin(create_plugin):
 
     return function
 
+
+@pytest.fixture()
+def authenticated_plugin(create_authenticated_plugin):
+    return create_authenticated_plugin()

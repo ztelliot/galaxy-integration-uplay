@@ -240,56 +240,86 @@ class GameStatusNotifier(object):
         self.watchers = {}
         self.statuses = {}
         self.launcher_log_path = None
+        self._legacy_game_launched = False
+
         if SYSTEM == System.WINDOWS:
             Thread(target=self._process_data, daemon=True).start()
 
     def update_game(self, game: UbisoftGame):
-
-        if game.launch_id in self.watchers:
-            if game.path == self.watchers[game.launch_id].path:
+        if game.install_id in self.watchers:
+            if game.path == self.watchers[game.install_id].path:
                 return
 
-        self.games[game.launch_id] = game
+        self.games[game.install_id] = game
 
     def _is_process_alive(self, game):
         try:
             self.process_watcher.update_watched_processes_list()
             for process in self.process_watcher.watched_processes:
                 if process.type == ProcessType.Game:
-                    if process.game.launch_id == game.launch_id:
+                    if process.game.install_id == game.install_id:
                         return True
             return False
         except Exception as e:
             log.error(f"Error checking if process is alive {repr(e)}")
             return False
 
-    def _parse_log(self, game, line_list):
-        try:
-            line = len(line_list) - 1
-            while line > 0:
-                if "disconnected" in line_list[line]:
-                    return False
-                if "has been started with product id" in line_list[line] and game.launch_id in line_list[line]:
-                    pid = int(
-                        re.search('Game with process id ([-+]?[0-9]+) has been started', line_list[line]).group(1))
-                    if pid:
-                        self.process_watcher.watch_process(psutil.Process(pid), game)
-                        return True
-                line = line - 1
-            return False
+    def _get_process_by_path(self, game: UbisoftGame):
+        for p in psutil.process_iter(attrs=['exe'], ad_value=''):
+            if game.path.lower() in p.info['exe'].lower():
+                try:
+                    if p.parent() and p.parent().exe() == game.path:
+                        return p.parent().pid
+                    return p.pid
+                except (psutil.AccessDenied, psutil.NoSuchProcess):
+                    pass
 
-        except Exception as e:
-            log.error(f"Error parsing launcher log file is game running {repr(e)}")
+    def _parse_log(self, game, line_list):
+        if line_list:
+            try:
+                line = len(line_list) - 1
+                while line > 0:
+                    if "disconnected" in line_list[line]:
+                        return False
+                    if "has been started with product id" in line_list[line] and f' {game.launch_id} (' in line_list[line]:
+                        pid = int(re.search('Game with process id ([-+]?[0-9]+) has been started', line_list[line]).group(1))
+                        if pid:
+                            self.process_watcher.watch_process(psutil.Process(pid), game)
+                            return True
+                    #  only when clicked PLAY on Legacy game
+                    if game.type == GameType.Legacy:
+                        if "Failed to fetch club game. Missing space id" in line_list[line]:
+                            if self._legacy_game_launched:
+                                pid = self._get_process_by_path(game)
+                                if pid:
+                                    self.process_watcher.watch_process(psutil.Process(int(pid)), game)
+                                    self._legacy_game_launched = False
+                                    return True
+                                else:
+                                    return False
+                            else:
+                                # test if Legacy Game is still running
+                                return self._is_process_alive(game)
+                    line = line - 1
+                return False
+
+            except Exception as e:
+                log.error(f"Error parsing launcher log file is game running {repr(e)}")
+                return False
+        else:
             return False
 
     def _is_game_running(self, game, line_list):
         try:
-            if self.statuses[game.launch_id] == GameStatus.Running:
-                return self._is_process_alive(game)
+            if game.launch_id in self.statuses:
+                if self.statuses[game.launch_id] == GameStatus.Running:
+                    return self._is_process_alive(game)
+                else:
+                    return self._parse_log(game, line_list)
             else:
-                return self._parse_log(game, line_list)
+                return False
         except Exception as e:
-            log.error(f"Error in checking is game running {repr(e)}")
+            log.error(f"Error in checking is game running {line_list} {game.launch_id} / {repr(e)}")
 
     def _get_launcher_log_lines(self, number_of_lines):
         line_list = []
@@ -306,24 +336,23 @@ class GameStatusNotifier(object):
         return line_list
 
     def _process_data(self):
-        statuses = {}
+        statuses = self.statuses
         while True:
             line_list = self._get_launcher_log_lines(50)
             try:
-                for launch_id, game in self.games.items():
-
+                for install_id, game in self.games.items():
                     if game.type == GameType.Steam:
-                        statuses[launch_id] = get_steam_game_status(game.path)
+                        statuses[install_id] = get_steam_game_status(game.path)
                         continue
                     else:
                         if not game.path:
                             game.path = _smart_return_local_game_path(game.special_registry_path, game.launch_id)
 
-                        statuses[launch_id] = _return_game_installed_status(game.path, game.exe, game.special_registry_path)
+                        statuses[install_id] = _return_game_installed_status(game.path, game.exe, game.special_registry_path)
 
-                    if statuses[launch_id] == GameStatus.Installed:
+                    if statuses[install_id] == GameStatus.Installed:
                         if self._is_game_running(game, line_list):
-                            statuses[launch_id] = GameStatus.Running
+                            statuses[install_id] = GameStatus.Running
 
             except Exception as e:
                 log.error(f"Process data error {repr(e)}")
@@ -384,8 +413,14 @@ class LocalParser(object):
 
         offset += 1  # skip 0x10
 
+        multiplier = 1
+        launch_id_2 = 0
         while header[offset] != 0x1A or (header[offset] == 0x1A and header[offset + 1] == 0x1A):
+            launch_id_2 += header[offset] * multiplier
+            multiplier *= 256
             offset += 1
+
+        launch_id_2 = self._convert_data(launch_id_2)
 
         # if object size is smaller than 128b, there might be a chance that secondary size will not occupy 2b
         if record_size - offset < 128 <= record_size:
@@ -394,7 +429,7 @@ class LocalParser(object):
 
         # we end up in the middle of header, return values normalized
         # to end of record as well real yaml size and game launch_id
-        return record_size - offset, launch_id, offset + tmp_size + 1
+        return record_size - offset, launch_id, launch_id_2, offset + tmp_size + 1
 
     def _parse_ownership_header(self, header):
         offset = 1
@@ -444,16 +479,17 @@ class LocalParser(object):
         try:
             while global_offset < len(configuration_content):
                 data = configuration_content[global_offset:]
-                object_size, launch_id, header_size = self._parse_configuration_header(data)
+                object_size, install_id, launch_id, header_size = self._parse_configuration_header(data)
 
-                record = {'size': object_size, 'offset': global_offset + header_size}
-                records[launch_id] = record
+                launch_id = install_id if launch_id == 0 or launch_id == install_id else launch_id
 
+                if object_size > 500:
+                    records[install_id] = {'size': object_size, 'offset': global_offset + header_size, 'install_id': install_id, 'launch_id': launch_id}
                 global_offset_tmp = global_offset
                 global_offset += object_size + header_size
 
                 if global_offset < len(configuration_content) and configuration_content[global_offset] != 0x0A:
-                    object_size, launch_id, header_size = self._parse_configuration_header(data, True)
+                    object_size, _, _, header_size = self._parse_configuration_header(data, True)
                     global_offset = global_offset_tmp + object_size + header_size
         except:
             log.exception("parse_configuration failed with exception. Possibly 'configuration' file corrupted")
@@ -480,7 +516,7 @@ class LocalParser(object):
             return []
         return records
 
-    def _parse_game(self, game_yaml, launch_id):
+    def _parse_game(self, game_yaml, install_id, launch_id):
         path = ''
         space_id = ''
         third_party_id = ''
@@ -490,6 +526,7 @@ class LocalParser(object):
         game_name = ''
         exe = ''
         launch_id = str(launch_id)
+        install_id = str(install_id)
 
         if 'space_id' in game_yaml['root']:
             space_id = game_yaml['root']['space_id']
@@ -537,10 +574,11 @@ class LocalParser(object):
                     game_yaml['localizations']['default']:
                 game_name = game_yaml['localizations']['default']['GAMENAME']
 
-        log.info(f"Parsed game from configuration {space_id}, {launch_id}, {game_name}")
+        log.info(f"Parsed game from configuration {space_id}, {install_id}, {game_name}, {launch_id}")
         return UbisoftGame(
             space_id=space_id,
             launch_id=launch_id,
+            install_id=install_id,
             third_party_id=third_party_id,
             name=game_name,
             path=path,
@@ -554,13 +592,12 @@ class LocalParser(object):
         self.configuration_raw = configuration_data
 
         configuration_records = self._parse_configuration()
-        for launch_id, game in configuration_records.items():
+        for _, game in configuration_records.items():
             if game['size']:
-                stream = self.configuration_raw[game['offset']: game['offset'] + game['size']].decode("utf8",
-                                                                                                      errors='ignore')
+                stream = self.configuration_raw[game['offset']: game['offset'] + game['size']].decode("utf8", errors='ignore')
                 if stream and 'start_game' in stream:
                     yaml_object = yaml.load(stream)
-                    yield self._parse_game(yaml_object, launch_id)
+                    yield self._parse_game(yaml_object, game['install_id'], game['launch_id'])
 
     def get_owned_local_games(self, ownership_data):
         self.ownership_raw = ownership_data

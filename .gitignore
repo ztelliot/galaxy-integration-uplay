@@ -8,7 +8,7 @@ webrtc_event_logs
 blob_storage
 plugin-uplay.spec
 
-# developement stuff
+# development stuff
 venv
 .DS_Store
 .vscode

@@ -1,4 +1,6 @@
 import asyncio
+import json
+import time
 import logging as log
 import multiprocessing
 import subprocess
@@ -6,19 +8,18 @@ import sys
 import webbrowser
 import datetime
 import dateutil.parser
-
+from yaml import scanner
 
 from galaxy.api.consts import Platform
 from galaxy.api.jsonrpc import ApplicationError
-from galaxy.api.errors import InvalidCredentials, AuthenticationRequired, AccessDenied
-
+from galaxy.api.errors import InvalidCredentials, AuthenticationRequired, AccessDenied, UnknownError
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo
 
 from backend import BackendClient
 from local import LocalParser, ProcessWatcher, GameStatusNotifier, LocalClient
 from definitions import GameStatus, System, SYSTEM, UbisoftGame, GameType
-from stats import find_playtime
+from stats import find_times
 from consts import AUTH_PARAMS, COOKIES
 from games_collection import GamesCollection
 from version import __version__
@@ -89,7 +90,6 @@ class UplayPlugin(Plugin):
                 self.parsing_club_games = True
                 games = await self.client.get_club_titles()
                 club_games = []
-
                 for game in games:
                     if "platform" in game:
                         if game["platform"] == "PC":
@@ -98,6 +98,7 @@ class UplayPlugin(Plugin):
                                 UbisoftGame(
                                     space_id=game['spaceId'],
                                     launch_id='',
+                                    install_id='',
                                     third_party_id='',
                                     name=game['title'],
                                     path='',
@@ -108,7 +109,7 @@ class UplayPlugin(Plugin):
                                     owned=True
                                 ))
 
-                self.games_collection.append(club_games)
+                self.games_collection.extend(club_games)
             except ApplicationError as e:
                 log.error(f"Encountered exception while parsing club games {repr(e)}")
                 raise e
@@ -126,23 +127,26 @@ class UplayPlugin(Plugin):
         A game in the games_collection which doesn't have a launch id probably
         means that a game was added through the get_club_titles request but its space id
         was not present in configuration file and we couldn't find a matching launch id for it."""
-        if self.local_client.configurations_accessible():
-            configuration_data = self.local_client.read_config()
-            p = LocalParser()
-            games = []
-            for game in p.parse_games(configuration_data):
-                games.append(game)
-            self.games_collection.append(games)
+        try:
+            if self.local_client.configurations_accessible():
+                configuration_data = self.local_client.read_config()
+                p = LocalParser()
+                games = []
+                for game in p.parse_games(configuration_data):
+                    games.append(game)
+                self.games_collection.extend(games)
+        except scanner.ScannerError as e:
+            log.error(f"Scanner error while parsing configuration, yaml is probably corrupted {repr(e)}")
 
     def _parse_local_game_ownership(self):
         if self.local_client.ownership_accesible():
             ownership_data = self.local_client.read_ownership()
             p = LocalParser()
             ownership_records = p.get_owned_local_games(ownership_data)
-            log.info(f" Ownership Records {ownership_records}")
+            log.info(f"Ownership Records {ownership_records}")
             for game in self.games_collection:
-                if game.launch_id:
-                    if int(game.launch_id) in ownership_records:
+                if game.install_id:
+                    if int(game.install_id) in ownership_records:
                         game.owned = True
 
     def _update_games(self):
@@ -156,19 +160,19 @@ class UplayPlugin(Plugin):
             return
 
         for game in self.games_collection:
-            if game.launch_id in cached_statuses:
+            if game.install_id in cached_statuses:
                 self.game_status_notifier.update_game(game)
-                if game.status != cached_statuses[game.launch_id]:
-                    log.info(f"Game {game.name} path changed: updating status from {cached_statuses[game.launch_id]} to {game.status}")
+                if game.status != cached_statuses[game.install_id]:
+                    log.info(f"Game {game.name} path changed: updating status from {cached_statuses[game.install_id]} to {game.status}")
                     self.update_local_game_status(game.as_local_game())
-                    self.cached_game_statuses[game.launch_id] = game.status
+                    self.cached_game_statuses[game.install_id] = game.status
             else:
                 self.game_status_notifier.update_game(game)
                 ''' If a game wasn't previously in a cache then and it appears with an installed or running status
                  it most likely means that client was just installed '''
                 if game.status in [GameStatus.Installed, GameStatus.Running]:
                     self.update_local_game_status(game.as_local_game())
-                self.cached_game_statuses[game.launch_id] = game.status
+                self.cached_game_statuses[game.install_id] = game.status
 
     async def get_local_games(self):
         self._parse_local_games()
@@ -190,28 +194,54 @@ class UplayPlugin(Plugin):
                 self.add_game(game.as_galaxy_game())
 
     async def get_game_times(self):
+        """This method is required to inform Galaxy that game time feature is supported.
+        Probably galaxy.api bug as only `import_game_times` is mentioned in documentation"""
+
+    async def import_game_times(self, game_ids):
+        def no_stats_for_game(game_id):
+            self.game_time_import_success(GameTime(game_id, None, None))
+
         if not self.client.is_authenticated():
             raise AuthenticationRequired()
-        game_times = []
-        games_with_space = [game for game in self.games_collection if game.space_id]
-        try:
-            tasks = [self.client.get_game_stats(game.space_id) for game in games_with_space]
-            stats = await asyncio.gather(*tasks)
-            for st, game in zip(stats, games_with_space):
-                statscards = st.get('Statscards', None)
-                if statscards is None:
+
+        blacklist = json.loads(self.persistent_cache.get('games_without_stats', '{}'))
+        current_time = int(time.time())
+
+        for game_id in game_ids:
+            try:
+                expire_in = blacklist.get(game_id, 0) - current_time
+                if expire_in > 0:
+                    log.debug(f'Cache: No game stats for {game_id}. Recheck in {expire_in}s')
+                    no_stats_for_game(game_id)
                     continue
-                playtime, last_played = find_playtime(statscards, default_total_time=0, default_last_played=0)
+
+                game = self.games_collection[game_id]
+                if not game.space_id:
+                    no_stats_for_game(game_id)
+                    continue
+
+                try:
+                    response = await self.client.get_game_stats(game.space_id)
+                except ApplicationError as err:
+                    self.game_time_import_failure(game_id, err)
+                    continue
+
+                statscards = response.get('Statscards', None)
+                if statscards is None:
+                    blacklist[game_id] = current_time + 3600 * 24 * 14  # two weeks
+                    no_stats_for_game(game_id)
+                    continue
+
+                playtime, last_played = find_times(statscards, game_id)
                 log.info(f'Stats for {game.name}: playtime: {playtime}, last_played: {last_played}')
-                if playtime is not None and last_played is not None:
-                    game_times.append(GameTime(game.space_id, playtime, last_played))
-        except ApplicationError as e:
-            log.exception("Game times:" + repr(e))
-            raise e
-        except Exception as e:
-            log.exception("Game times:" + repr(e))
-        finally:
-            return game_times
+                self.game_time_import_success(GameTime(game_id, playtime, last_played))
+
+            except Exception as e:
+                log.error(f"Getting game times for game {game_id} has crashed: " + repr(e))
+                self.game_time_import_failure(game_id, UnknownError())
+
+        self.persistent_cache['games_without_stats'] = json.dumps(blacklist)
+        self.push_cache()
 
     async def get_unlocked_challenges(self, game_id):
         """Challenges are a unique uplay club feature and don't directly translate to achievements"""
@@ -234,13 +264,15 @@ class UplayPlugin(Plugin):
             return
 
         for game in self.games_collection.get_local_games():
-            if (game.space_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
+            if (game.space_id == game_id or game.install_id == game_id) and game.status == GameStatus.Installed:
                 if game.type == GameType.Steam:
                     if is_steam_installed():
                         url = f"start steam://rungameid/{game.third_party_id}"
                     else:
                         url = f"start uplay://open/game/{game.launch_id}"
                 elif game.type == GameType.New or game.type == GameType.Legacy:
+                    log.debug('Launching legacy game')
+                    self.game_status_notifier._legacy_game_launched = True
                     url = f"start uplay://launch/{game.launch_id}"
                 else:
                     log.error(f"Unsupported game type {game.name}")
@@ -248,6 +280,7 @@ class UplayPlugin(Plugin):
                     return
 
                 log.info(f"Launching game '{game.name}' by protocol: [{url}]")
+
                 subprocess.Popen(url, shell=True)
                 return
 
@@ -255,15 +288,16 @@ class UplayPlugin(Plugin):
         self.open_uplay_client()
 
     async def install_game(self, game_id):
+        log.debug(self.games_collection)
         if not self.user_can_perform_actions():
             return
 
         for game in self.games_collection:
-            if (game.space_id == game_id or game.launch_id == game_id) and game.status in [GameStatus.NotInstalled,
+            if game.owned and (game.space_id == game_id or game.install_id == game_id) and game.status in [GameStatus.NotInstalled,
                                                                                            GameStatus.Unknown]:
-                if game.launch_id:
-                    log.info(f"Found game with game_id: {game_id}, {game.launch_id}")
-                    subprocess.Popen(f"start uplay://install/{game.launch_id}", shell=True)
+                if game.install_id:
+                    log.info(f"Installing game: {game_id}, {game}")
+                    subprocess.Popen(f"start uplay://install/{game.install_id}", shell=True)
                     return
         # if launch_id is not known, try to launch local client instead
         self.open_uplay_client()
@@ -303,20 +337,18 @@ class UplayPlugin(Plugin):
         if not self.local_client.was_user_logged_in:
             return
         statuses = self.game_status_notifier.statuses
-
         new_games = []
-
         for game in self.games_collection:
-            if game.launch_id in statuses:
-                if statuses[game.launch_id] == GameStatus.Installed and game.status != GameStatus.Installed:
+            if game.install_id in statuses:
+                if statuses[game.install_id] == GameStatus.Installed and game.status != GameStatus.Installed:
                     log.info(f"updating status for {game.name} to installed")
                     game.status = GameStatus.Installed
                     self.update_local_game_status(game.as_local_game())
-                elif statuses[game.launch_id] == GameStatus.Running and game.status != GameStatus.Running:
+                elif statuses[game.install_id] == GameStatus.Running and game.status != GameStatus.Running:
                     log.info(f"updating status for {game.name} to running")
                     game.status = GameStatus.Running
                     self.update_local_game_status(game.as_local_game())
-                elif statuses[game.launch_id] in [GameStatus.NotInstalled, GameStatus.Unknown] and game.status not in [GameStatus.NotInstalled, GameStatus.Unknown]:
+                elif statuses[game.install_id] in [GameStatus.NotInstalled, GameStatus.Unknown] and game.status not in [GameStatus.NotInstalled, GameStatus.Unknown]:
                     log.info(f"updating status for {game.name} to not installed")
                     game.status = GameStatus.NotInstalled
                     self.update_local_game_status(game.as_local_game())

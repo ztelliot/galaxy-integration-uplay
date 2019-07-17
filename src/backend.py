@@ -53,7 +53,7 @@ class BackendClient(HttpClient):
         async def _refresh_and_request():
             await self._refresh_ticket()
             return await self._do_request(method, *args, **kwargs)
-        
+
         if self.__refresh_in_progress:
             log.info(f'Refreshing already in progress. Calling url without refresh')
             return await self._do_request(method, *args, **kwargs)
@@ -169,13 +169,13 @@ class BackendClient(HttpClient):
             "userId": self.user_id,
             "refreshTime": self.refresh_time
         }
-    
+
     async def authorise_with_stored_credentials(self, credentials):
         self.restore_credentials(credentials)
         user_data = await self.get_user_data()
         await self.post_sessions()
         return user_data
-    
+
     async def authorise_with_cookies(self, cookies):
         user_data = {}
         tasty_cookies = ['user_id', 'user_name', 'ticket', 'rememberMeTicket', 'sessionId']
@@ -207,7 +207,7 @@ class BackendClient(HttpClient):
 
         try:
             j = await self._do_request('get', url, add_to_headers=headers)
-        except UnknownError:  # no stats available for this user
+        except UnknownError:  # 412: no stats available for this user
             return {}
         return j
 

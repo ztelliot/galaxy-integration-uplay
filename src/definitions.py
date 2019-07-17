@@ -48,19 +48,9 @@ class ProcessType(EnumMeta):
 
 @dataclass
 class UbisoftGame(object):
-
-    def as_local_game(self):
-        if not self.space_id:
-            return LocalGame(self.launch_id, GameStatusTranslator[self.status])
-        else:
-            return LocalGame(self.space_id, GameStatusTranslator[self.status])
-
-    def as_galaxy_game(self):
-        passed_id = self.space_id if self.space_id else self.launch_id
-        return Game(passed_id, self.name, [], LicenseInfo(LicenseType.SinglePurchase))
-
     space_id: str
     launch_id: str
+    install_id: str
     third_party_id: str
     name: str
     path: str
@@ -71,6 +61,15 @@ class UbisoftGame(object):
     considered_for_sending: bool = False
     status: Optional[GameStatus] = GameStatus.Unknown
 
+    def as_local_game(self):
+        if not self.space_id:
+            return LocalGame(self.launch_id, GameStatusTranslator[self.status])
+        else:
+            return LocalGame(self.space_id, GameStatusTranslator[self.status])
+
+    def as_galaxy_game(self):
+        passed_id = self.space_id if self.space_id else self.launch_id
+        return Game(passed_id, self.name, [], LicenseInfo(LicenseType.SinglePurchase))
 
 @dataclass
 class WatchedProcess(object):

@@ -2,6 +2,7 @@ import asyncio
 import unittest.mock as mock
 
 from tests.conftest import NewGame
+from tests.async_mock import AsyncMock
 
 
 def test_install_game_space_id(create_authenticated_plugin):
@@ -57,11 +58,13 @@ def test_install_game_game_installed(create_authenticated_plugin):
 
     pg.open_uplay_client = mock.create_autospec(pg.open_uplay_client)
 
+    pg.launch_game = AsyncMock(return_value=None)
+
     with mock.patch("plugin.subprocess.Popen") as pop:
         loop.run_until_complete(pg.install_game("321"))
         pop.assert_not_called()
 
-    pg.open_uplay_client.assert_called()
+    pg.launch_game.asert_called()
 
 
 def test_install_game_empty_collection(create_authenticated_plugin):

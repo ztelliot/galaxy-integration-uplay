@@ -24,7 +24,8 @@ from consts import AUTH_PARAMS, COOKIES
 from games_collection import GamesCollection
 from version import __version__
 from steam import is_steam_installed
-
+if System.WINDOWS == SYSTEM:
+    import ctypes
 
 class UplayPlugin(Plugin):
     def __init__(self, reader, writer, token):
@@ -264,6 +265,7 @@ class UplayPlugin(Plugin):
             return
 
         for game in self.games_collection.get_local_games():
+
             if (game.space_id == game_id or game.install_id == game_id) and game.status == GameStatus.Installed:
                 if game.type == GameType.Steam:
                     if is_steam_installed():
@@ -284,6 +286,12 @@ class UplayPlugin(Plugin):
                 subprocess.Popen(url, shell=True)
                 return
 
+        for game in self.games_collection:
+            if (game.space_id == game_id or game.install_id == game_id) and game.status in [GameStatus.NotInstalled,
+                                                                                            GameStatus.Unknown]:
+                log.warning("Game is not installed, installing")
+                return await self.install_game(game_id)
+
         log.info("Failed to launch game, launching client instead.")
         self.open_uplay_client()
 
@@ -299,6 +307,10 @@ class UplayPlugin(Plugin):
                     log.info(f"Installing game: {game_id}, {game}")
                     subprocess.Popen(f"start uplay://install/{game.install_id}", shell=True)
                     return
+            if game.owned and (game.space_id == game_id or game.install_id == game_id) and game.status == GameStatus.Installed:
+                log.warning("Game already installed, launching")
+                return await self.launch_game(game_id)
+
         # if launch_id is not known, try to launch local client instead
         self.open_uplay_client()
         log.info(
@@ -312,6 +324,7 @@ class UplayPlugin(Plugin):
             if (game.space_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
                 subprocess.Popen(f"start uplay://uninstall/{game.launch_id}", shell=True)
                 return
+
         self.open_uplay_client()
         log.info(
             f"Did not found game with game_id: {game_id}, proper launch_id and Installed status, launching client.")
@@ -340,10 +353,15 @@ class UplayPlugin(Plugin):
         new_games = []
         for game in self.games_collection:
             if game.install_id in statuses:
-                if statuses[game.install_id] == GameStatus.Installed and game.status != GameStatus.Installed:
-                    log.info(f"updating status for {game.name} to installed")
+                if statuses[game.install_id] == GameStatus.Installed and game.status in [GameStatus.NotInstalled, GameStatus.Unknown]:
+                    log.info(f"updating status for {game.name} to installed from not installed")
                     game.status = GameStatus.Installed
                     self.update_local_game_status(game.as_local_game())
+                elif statuses[game.install_id] == GameStatus.Installed and game.status == GameStatus.Running:
+                    log.info(f"updating status for {game.name} to installed from running")
+                    game.status = GameStatus.Installed
+                    self.update_local_game_status(game.as_local_game())
+                    asyncio.create_task(self.prevent_uplay_from_showing())
                 elif statuses[game.install_id] == GameStatus.Running and game.status != GameStatus.Running:
                     log.info(f"updating status for {game.name} to running")
                     game.status = GameStatus.Running
@@ -366,6 +384,33 @@ class UplayPlugin(Plugin):
             FriendInfo(user_id=friend["pid"], user_name=friend["nameOnPlatform"])
             for friend in friends["friends"]
         ]
+
+    async def shutdown_platform_client(self):
+        log.info("Shutdown platform client called")
+        if self.local_client.is_installed:
+            subprocess.Popen("taskkill.exe /im \"upc.exe\"", shell=True)
+
+    async def prevent_uplay_from_showing(self):
+        client_popup_wait_time = 5
+        check_frequency_delay = 0.02
+
+        hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
+        end_time = time.time() + client_popup_wait_time
+
+        if hwnd:
+            try:
+                while not ctypes.windll.user32.IsWindowVisible(hwnd):
+                    if time.time() >= end_time:
+                        log.info("Timed out post close game uplay popup")
+                        break
+                    await asyncio.sleep(check_frequency_delay)
+                    try:
+                        hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
+                    except Exception as e:
+                        log.error(f"exception while retrieving window handle {hwnd} {repr(e)}")
+                await self.shutdown_platform_client()
+            except Exception as e:
+                log.error(f"Exception when checking if window is visible {repr(e)}")
 
     def tick(self):
         loop = asyncio.get_event_loop()

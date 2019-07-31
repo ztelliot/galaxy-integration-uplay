@@ -19,6 +19,7 @@ class BackendClient(HttpClient):
         self.refresh_token = None
         self.refresh_time = None
         self.user_id = None
+        self.user_name = None
         self.__refresh_in_progress = False
         super().__init__()
         self._session.headers = {
@@ -150,6 +151,8 @@ class BackendClient(HttpClient):
         self.token = data['ticket']
         self.session_id = data['sessionId']
         self.user_id = data['userId']
+        if data.get('username'):
+            self.user_name = data['username']
         self.refresh_time = data.get('refreshTime', '0')
         if data.get('rememberMeTicket'):
             self.refresh_token = data['rememberMeTicket']
@@ -162,17 +165,24 @@ class BackendClient(HttpClient):
         self._plugin.store_credentials(self.get_credentials())
 
     def get_credentials(self):
-        return {
-            "ticket": self.token,
+        creds = {"ticket": self.token,
             "sessionId": self.session_id,
             "rememberMeTicket": self.refresh_token,
             "userId": self.user_id,
-            "refreshTime": self.refresh_time
-        }
+            "refreshTime": self.refresh_time}
+
+        if self.user_name:
+            creds["username"] = self.user_name
+
+        return creds
 
     async def authorise_with_stored_credentials(self, credentials):
         self.restore_credentials(credentials)
-        user_data = await self.get_user_data()
+        if not self.user_name or not self.user_id:
+            user_data = await self.get_user_data()
+        else:
+            user_data = {"username": self.user_name,
+                         "userId": self.user_id}
         await self.post_sessions()
         return user_data
 
@@ -189,6 +199,7 @@ class BackendClient(HttpClient):
         await self.post_sessions()
         return user_data
 
+    # Deprecated 0.39
     async def get_user_data(self):
         return await self._do_request_safe('get', f"https://public-ubiservices.ubi.com/v3/users/{self.user_id}")
 

@@ -385,7 +385,7 @@ class UplayPlugin(Plugin):
             for friend in friends["friends"]
         ]
 
-    async def shutdown_platform_client(self):
+    async def _shutdown_client(self):
         log.info("Shutdown platform client called")
         if self.local_client.is_installed:
             subprocess.Popen("taskkill.exe /im \"upc.exe\"", shell=True)
@@ -408,7 +408,7 @@ class UplayPlugin(Plugin):
                         hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
                     except Exception as e:
                         log.error(f"exception while retrieving window handle {hwnd} {repr(e)}")
-                await self.shutdown_platform_client()
+                await self._shutdown_client()
             except Exception as e:
                 log.error(f"Exception when checking if window is visible {repr(e)}")
 

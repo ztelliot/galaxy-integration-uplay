@@ -24,7 +24,7 @@ def _patch_plugin(mocker, authenticated_plugin):
         authenticated_plugin.client.get_game_stats = AsyncMock(return_value={'Statscards': []})
 
         collection = GamesCollection()
-        collection.extend([MockUbisoftGame(gt.game_id) for gt in game_times])
+        collection.extend([MockUbisoftGame(gt.game_id) for gt in game_times], True)
         authenticated_plugin.games_collection = collection
 
         mocker.patch('plugin.find_times', autospec=True, side_effect=[

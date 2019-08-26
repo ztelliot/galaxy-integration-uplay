@@ -20,6 +20,22 @@ def is_steam_installed():
     return False
 
 
+def _parse_steam_registry_status(key):
+    if int(winreg.QueryValueEx(key, "Installed")[0]):
+        try:
+            if int(winreg.QueryValueEx(key, "Running")[0]):
+                return GameStatus.Running
+            elif int(winreg.QueryValueEx(key, "Updating")[0]):
+                # todo, 'Updating' status not yet supported
+                return GameStatus.Installed
+            else:
+                return GameStatus.Installed
+        except WindowsError:
+            return GameStatus.Installed
+    else:
+        return GameStatus.NotInstalled
+
+
 def get_steam_game_status(path):
     if not path:
         return GameStatus.NotInstalled
@@ -29,18 +45,6 @@ def get_steam_game_status(path):
     end = reg_path.lower().find("installed")
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path[index:end], 0, winreg.KEY_READ) as key:
-            if int(winreg.QueryValueEx(key, "Installed")[0]):
-                try:
-                    if int(winreg.QueryValueEx(key, "Running")[0]):
-                        return GameStatus.Running
-                    elif int(winreg.QueryValueEx(key, "Updating")[0]):
-                        # todo, 'Updating' status not yet supported
-                        return GameStatus.Installed
-                    else:
-                        return GameStatus.Installed
-                except WindowsError:
-                    return GameStatus.Installed
-            else:
-                return GameStatus.NotInstalled
+            return _parse_steam_registry_status(key)
     except WindowsError:
         return GameStatus.NotInstalled

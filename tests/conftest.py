@@ -28,8 +28,8 @@ class NewGame(object):
 @pytest.fixture()
 def local_client():
     mock = MagicMock()
-    mock.is_installed = False
     mock.was_user_logged_in = False
+    mock.ownership_accesible.return_value = False
     mock.configurations_accessible.return_value = False
     return mock
 

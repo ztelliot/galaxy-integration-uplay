@@ -17,7 +17,9 @@ from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo
 
 from backend import BackendClient
-from local import LocalParser, ProcessWatcher, GameStatusNotifier, LocalClient
+from local_client import LocalClient
+from local_file_parser import LocalParser
+from local_game_status import ProcessWatcher, GameStatusNotifier
 from definitions import GameStatus, System, SYSTEM, UbisoftGame, GameType
 from stats import find_times
 from consts import AUTH_PARAMS, COOKIES
@@ -110,7 +112,7 @@ class UplayPlugin(Plugin):
                                     owned=True
                                 ))
 
-                self.games_collection.extend(club_games)
+                self.games_collection.extend(club_games,self.local_client.ownership_accesible())
             except ApplicationError as e:
                 log.error(f"Encountered exception while parsing club games {repr(e)}")
                 raise e
@@ -135,7 +137,7 @@ class UplayPlugin(Plugin):
                 games = []
                 for game in p.parse_games(configuration_data):
                     games.append(game)
-                self.games_collection.extend(games)
+                self.games_collection.extend(games, self.local_client.ownership_accesible())
         except scanner.ScannerError as e:
             log.error(f"Scanner error while parsing configuration, yaml is probably corrupted {repr(e)}")
 
@@ -428,11 +430,9 @@ class UplayPlugin(Plugin):
                         loop.run_in_executor(None, self._update_games)
         return
 
-
     def shutdown(self):
         log.info("Plugin shutdown.")
         asyncio.create_task(self.client.close())
-
 
 def main():
     multiprocessing.freeze_support()
@@ -441,4 +441,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

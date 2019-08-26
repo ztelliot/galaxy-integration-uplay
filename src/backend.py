@@ -1,7 +1,11 @@
 from datetime import datetime
 import logging as log
-from galaxy.http import HttpClient
+from galaxy.http import handle_exception, create_tcp_connector, create_client_session
 import dateutil.parser
+
+import aiohttp
+import asyncio
+import time
 
 from galaxy.api.errors import (
     AuthenticationRequired, AccessDenied, UnknownError
@@ -9,8 +13,7 @@ from galaxy.api.errors import (
 
 from consts import CLUB_APPID, CHROME_USERAGENT
 
-
-class BackendClient(HttpClient):
+class BackendClient():
     def __init__(self, plugin):
         self._plugin = plugin
         self._auth_lost_callback = None
@@ -21,13 +24,33 @@ class BackendClient(HttpClient):
         self.user_id = None
         self.user_name = None
         self.__refresh_in_progress = False
-        super().__init__()
+        connector = create_tcp_connector(limit=30)
+        self._session = create_client_session(connector=connector, timeout=aiohttp.ClientTimeout(total=120), cookie_jar=None)
+
         self._session.headers = {
             'Authorization': None,
             'Ubi-AppId': CLUB_APPID,
             "User-Agent": CHROME_USERAGENT,
             'Ubi-SessionId': None
         }
+
+    async def close(self):
+        # If closing is attempted while plugin is inside refresh workflow then give it a chance to finish it.
+        if self.__refresh_in_progress:
+            time.sleep(1.5)
+        await self._session.close()
+
+    async def request(self, method, url, *args, **kwargs):
+        with handle_exception():
+            try:
+                return await self._session.request(method, url, *args, **kwargs)
+            except aiohttp.ClientResponseError as error:
+                if error.status >= 500:
+                    log.warning(
+                        "Got status %d while performing %s request for %s",
+                        error.status, error.request_info.method, str(error.request_info.url)
+                    )
+                raise error
 
     def set_auth_lost_callback(self, callback):
         self._auth_lost_callback = callback
@@ -44,40 +67,29 @@ class BackendClient(HttpClient):
                 kwargs['headers'][header] = kwargs['add_to_headers'][header]
             kwargs.pop('add_to_headers')
 
-        r = await super().request(method, *args, **kwargs)
+        r = await self.request(method, *args, **kwargs)
         j = await r.json()  # all ubi endpoints return jsons
         log.info(f"Response status: {r}")
         return j
 
     async def _do_request_safe(self, method, *args, **kwargs):
-
-        async def _refresh_and_request():
-            await self._refresh_ticket()
-            return await self._do_request(method, *args, **kwargs)
-
-        if self.__refresh_in_progress:
-            log.info(f'Refreshing already in progress. Calling url without refresh')
-            return await self._do_request(method, *args, **kwargs)
-
-        self.__refresh_in_progress = True
         result = {}
         try:
+            refresh_needed = False
             if not self.refresh_token:
-                result = await _refresh_and_request()
-            else:
                 log.debug(f'rememberMeTicket expiration time: {str(self.refresh_time)}')
                 refresh_needed = self.refresh_time is None or datetime.now() > datetime.fromtimestamp(int(self.refresh_time))
-                if refresh_needed:
-                    await self._refresh_remember_me()
-                    result = await _refresh_and_request()
-                else:
-                    try:
-                        result = await _refresh_and_request()
-                    except (AccessDenied, AuthenticationRequired):
-                        # fallback for another reason than expired time or wrong calculation due to changing time zones
-                        log.debug('Fallback refresh')
-                        await self._refresh_remember_me()
-                        result = await _refresh_and_request()
+            if refresh_needed:
+                await self._refresh_auth()
+                result = await self._do_request(method, *args, **kwargs)
+            else:
+                try:
+                    result = await self._do_request(method, *args, **kwargs)
+                except (AccessDenied, AuthenticationRequired):
+                    # fallback for another reason than expired time or wrong calculation due to changing time zones
+                    log.debug('Fallback refresh')
+                    await self._refresh_auth()
+                    result = await self._do_request(method, *args, **kwargs)
         except (AccessDenied, AuthenticationRequired) as e:
             log.debug(f"Unable to refresh authentication calling auth lost: {repr(e)}")
             if self._auth_lost_callback:
@@ -86,11 +98,6 @@ class BackendClient(HttpClient):
         except Exception as e:
             log.debug("Refresh workflow has failed:" + repr(e))
             raise
-        else:
-            self._plugin.store_credentials(self.get_credentials())
-        finally:
-            self.__refresh_in_progress = False
-
         return result
 
     async def _do_options_request(self):
@@ -99,6 +106,20 @@ class BackendClient(HttpClient):
             "Referer": "https://connect.ubisoft.com/login?appId=314d4fef-e568-454a-ae06-43e3bece12a6",
             "User-Agent": CHROME_USERAGENT,
         })
+
+    async def _refresh_auth(self):
+        if self.__refresh_in_progress:
+            log.info(f'Refreshing already in progress.')
+            while self.__refresh_in_progress:
+                await asyncio.sleep(0.2)
+        else:
+            self.__refresh_in_progress = True
+            try:
+                await self._refresh_remember_me()
+                await self._refresh_ticket()
+                self._plugin.store_credentials(self.get_credentials())
+            finally:
+                self.__refresh_in_progress = False
 
     async def _refresh_remember_me(self):
         log.debug('Refreshing rememberMeTicket')
@@ -162,7 +183,6 @@ class BackendClient(HttpClient):
             "Authorization": f"Ubi_v1 t={self.token}",
             "Ubi-SessionId": self.session_id
         }
-        self._plugin.store_credentials(self.get_credentials())
 
     def get_credentials(self):
         creds = {"ticket": self.token,
@@ -184,6 +204,7 @@ class BackendClient(HttpClient):
             user_data = {"username": self.user_name,
                          "userId": self.user_id}
         await self.post_sessions()
+        self._plugin.store_credentials(self.get_credentials())
         return user_data
 
     async def authorise_with_cookies(self, cookies):
@@ -197,6 +218,7 @@ class BackendClient(HttpClient):
 
         self.restore_credentials(user_data)
         await self.post_sessions()
+        self._plugin.store_credentials(self.get_credentials())
         return user_data
 
     # Deprecated 0.39

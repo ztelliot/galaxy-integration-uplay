@@ -262,3 +262,17 @@ class BackendClient():
         headers['Content-Type'] = 'application/json'
         j = await self._do_request_safe('post', f"https://public-ubiservices.ubi.com/v2/profiles/sessions", add_to_headers=headers)
         return j
+
+    async def get_subscription_titles(self):
+        try:
+            r = await self._do_request('get', f"https://api-uplayplusvault.ubi.com/v1/games?locale=en-US")
+        except AuthenticationRequired:
+            log.info("Uplay plus Subscription not active")
+            return None
+        return r["games"]
+
+    async def activate_game(self, activation_id):
+        r = await self._do_request_safe('post', f"https://api-uplayplusvault.ubi.com/v1/games/activate/{activation_id}")
+        if 'games' in r:
+            return True
+        return False

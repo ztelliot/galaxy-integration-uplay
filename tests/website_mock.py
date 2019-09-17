@@ -48,6 +48,9 @@ class BackendClientMock(AsyncMock):
     async def get_friends(self):
         return {'friends': [{'pid': '420', 'nameOnPlatform': 'mocker1', 'lastModified': '2018-12-27T00:00:00.0000000', 'state': 'Friends'}, {'pid': '123', 'nameOnPlatform': 'mocker2', 'lastModified': '2019-03-29T00:00:00.0000000', 'state': 'Friends'}, {'pid': '321', 'nameOnPlatform': 'mocker3', 'lastModified': '2019-05-14T00:00:00.0000000', 'state': 'Friends'}]}
 
+    async def get_subscription_titles(self):
+        return None
+
     async def get_club_titles(self):
         return [
     {

@@ -1,9 +1,9 @@
 import pytest
-from unittest.mock import Mock, MagicMock, call
+from unittest.mock import Mock, MagicMock
 from tests.async_mock import AsyncMock
 
 from galaxy.api.types import GameTime
-from galaxy.api.errors import BackendNotAvailable, UnknownError
+from galaxy.api.errors import BackendNotAvailable
 from src.games_collection import GamesCollection
 
 
@@ -44,23 +44,26 @@ async def test_game_times_variants(_patch_plugin):
         GameTime('144', 2434, 1553439634),
     ]
     plugin = _patch_plugin(game_times)
-    await plugin.import_game_times([gt.game_id for gt in game_times])
-
-    plugin.game_time_import_success.assert_has_calls(
-        [call(gt) for gt in game_times], any_order=True)
-    plugin.game_time_import_failure.assert_not_called()
-
+    context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
+    assert context == {
+        "121": GameTime(game_id="121", time_played=None, last_played_time=1553169680),
+        "122": GameTime(game_id="122", time_played=1312, last_played_time=None),
+        "133": GameTime(game_id="133", time_played=None, last_played_time=None),
+        "144": GameTime(game_id="144", time_played=2434, last_played_time=1553439634)
+    }      
+    
 
 @pytest.mark.asyncio
 async def test_game_has_no_statscards(_patch_plugin):
     game_time = GameTime('121', None, None)
     plugin = _patch_plugin([game_time])
     plugin.client.get_game_stats = AsyncMock(return_value={})
-    await plugin.import_game_times([game_time.game_id])
-
-    plugin.game_time_import_success.assert_called_once_with(game_time)
-    plugin.game_time_import_failure.assert_not_called()
-
+    context = await plugin.prepare_game_times_context([game_time.game_id])
+    
+    assert context == {
+    "121": GameTime(game_id="121", time_played=None, last_played_time=None)
+    }
+    
 
 @pytest.mark.asyncio
 async def test_backend_error(_patch_plugin):
@@ -70,10 +73,9 @@ async def test_backend_error(_patch_plugin):
 
     plugin = _patch_plugin(game_times)
     plugin.client.get_game_stats = AsyncMock(side_effect=error)
-    await plugin.import_game_times([gt.game_id for gt in game_times])
-
-    plugin.game_time_import_success.assert_not_called()
-    plugin.game_time_import_failure.assert_called_once_with(game_id, error)
+    context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
+    
+    assert context == {}
 
 
 @pytest.mark.asyncio
@@ -85,10 +87,11 @@ async def test_ask_for_space_id(_patch_plugin):
 
     plugin = _patch_plugin(game_times)
     plugin.games_collection = GamesCollection([MockUbisoftGame(space_id, launch_id)])
-    await plugin.import_game_times([gt.game_id for gt in game_times])
+    context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
 
-    plugin.game_time_import_success.assert_called_once_with(game_times[0])
-    plugin.game_time_import_failure.assert_not_called()
+    assert context == {
+    "adsdf-2323e2-sdfasdf-11231": GameTime(game_id="adsdf-2323e2-sdfasdf-11231", time_played=231, last_played_time=1553169680)
+    }
 
 
 @pytest.mark.asyncio
@@ -100,10 +103,11 @@ async def test_ask_for_launch_id(_patch_plugin):
 
     plugin = _patch_plugin(game_times)
     plugin.games_collection = GamesCollection([MockUbisoftGame(space_id, launch_id)])
-    await plugin.import_game_times([gt.game_id for gt in game_times])
-
-    plugin.game_time_import_success.assert_called_once_with(game_times[0])
-    plugin.game_time_import_failure.assert_not_called()
+    context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
+    
+    assert context == {
+    "555": GameTime(game_id="555", time_played=231, last_played_time=1553169680)
+    }
 
 
 @pytest.mark.asyncio
@@ -113,10 +117,9 @@ async def test_game_not_in_games_collection(_patch_plugin):
 
     plugin = _patch_plugin(game_times)
     plugin.games_collection = GamesCollection()
-    await plugin.import_game_times([gog_backend_id])
-
-    plugin.game_time_import_success.assert_not_called()
-    plugin.game_time_import_failure.assert_called_once_with(gog_backend_id, UnknownError())
+    context = await plugin.prepare_game_times_context([gog_backend_id])
+    
+    assert context == {}
 
 
 @pytest.mark.asyncio
@@ -128,13 +131,20 @@ async def test_cache(mocker, _patch_plugin):
     plugin = _patch_plugin(game_times)
     plugin.client.get_game_stats = AsyncMock(return_value={})
     # import stats first time
-    await plugin.import_game_times([gt.game_id for gt in game_times])
-    plugin.game_time_import_success.assert_has_calls([call(gt) for gt in game_times], any_order=True)
+    context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
+    
+    assert context == {
+    "121": GameTime(game_id="121", time_played=None, last_played_time=None)
+    }
+    
     # refresh mocks
     mocker.stopall()
     plugin = _patch_plugin(game_times)
     plugin.client.get_game_stats = AsyncMock(return_value={})
     # import stats second time
-    await plugin.import_game_times([gt.game_id for gt in game_times])
-    plugin.game_time_import_success.assert_has_calls([call(gt) for gt in game_times], any_order=True)
-    plugin.client.get_game_stats.assert_not_called()
+    context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
+    
+    assert context == {
+    "121": GameTime(game_id="121", time_played=None, last_played_time=None)
+    }
+    

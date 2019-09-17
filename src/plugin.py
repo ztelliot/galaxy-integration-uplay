@@ -78,6 +78,7 @@ class UplayPlugin(Plugin):
         self._parse_local_game_ownership()
 
         await self._parse_club_games()
+        await self._parse_subscription_games()
 
         self.owned_games_sent = True
 
@@ -85,7 +86,29 @@ class UplayPlugin(Plugin):
             game.considered_for_sending = True
 
         return [game.as_galaxy_game() for game in self.games_collection
-                if game.owned]
+                if game.owned or game.activation_id]
+
+    async def _parse_subscription_games(self):
+        subscription_games = []
+        games = await self.client.get_subscription_titles()
+        if not games:
+            return
+        for game in games:
+            subscription_games.append(UbisoftGame(
+                            space_id='',
+                            launch_id=str(game['uplayGameId']),
+                            install_id='',
+                            third_party_id='',
+                            name=game['name'],
+                            path='',
+                            type=GameType.New,
+                            special_registry_path='',
+                            exe='',
+                            status=GameStatus.Unknown,
+                            owned=game['ownership'],
+                            activation_id=str(game['id'])
+                        ))
+        self.games_collection.extend(subscription_games, self.local_client.ownership_accesible())
 
     async def _parse_club_games(self):
         if not self.parsing_club_games:
@@ -112,7 +135,7 @@ class UplayPlugin(Plugin):
                                     owned=True
                                 ))
 
-                self.games_collection.extend(club_games,self.local_client.ownership_accesible())
+                self.games_collection.extend(club_games, self.local_client.ownership_accesible())
             except ApplicationError as e:
                 log.error(f"Encountered exception while parsing club games {repr(e)}")
                 raise e
@@ -151,10 +174,14 @@ class UplayPlugin(Plugin):
                 if game.install_id:
                     if int(game.install_id) in ownership_records:
                         game.owned = True
+                if game.launch_id:
+                    if int(game.launch_id) in ownership_records:
+                        game.owned = True
 
     def _update_games(self):
         self.updating_games = True
         self._parse_local_games()
+        self._parse_local_game_ownership()
         self.updating_games = False
 
     def _update_local_games_status(self):
@@ -196,17 +223,20 @@ class UplayPlugin(Plugin):
             if game.owned:
                 self.add_game(game.as_galaxy_game())
 
-    async def get_game_times(self):
-        """This method is required to inform Galaxy that game time feature is supported.
-        Probably galaxy.api bug as only `import_game_times` is mentioned in documentation"""
+    async def prepare_game_times_context(self, game_ids):
+        return await self.get_playtime(game_ids)
 
-    async def import_game_times(self, game_ids):
-        def no_stats_for_game(game_id):
-            self.game_time_import_success(GameTime(game_id, None, None))
+    async def get_game_time(self, game_id, context):
+        game_time = context.get(game_id)
+        if game_time is None:
+            raise UnknownError("Game {} not owned".format(game_id))
+        return game_time
 
+    async def get_playtime(self, game_ids):
         if not self.client.is_authenticated():
             raise AuthenticationRequired()
 
+        games_playtime = {}
         blacklist = json.loads(self.persistent_cache.get('games_without_stats', '{}'))
         current_time = int(time.time())
 
@@ -215,36 +245,41 @@ class UplayPlugin(Plugin):
                 expire_in = blacklist.get(game_id, 0) - current_time
                 if expire_in > 0:
                     log.debug(f'Cache: No game stats for {game_id}. Recheck in {expire_in}s')
-                    no_stats_for_game(game_id)
+                    games_playtime[game_id] = GameTime(game_id, None, None)
                     continue
 
                 game = self.games_collection[game_id]
                 if not game.space_id:
-                    no_stats_for_game(game_id)
+                    games_playtime[game_id] = GameTime(game_id, None, None)
                     continue
 
                 try:
                     response = await self.client.get_game_stats(game.space_id)
                 except ApplicationError as err:
-                    self.game_time_import_failure(game_id, err)
+                    self._game_time_import_failure(game_id, err)
                     continue
 
                 statscards = response.get('Statscards', None)
                 if statscards is None:
                     blacklist[game_id] = current_time + 3600 * 24 * 14  # two weeks
-                    no_stats_for_game(game_id)
+                    games_playtime[game_id] = GameTime(game_id, None, None)
                     continue
 
                 playtime, last_played = find_times(statscards, game_id)
+                if playtime == 0:
+                    playtime = None
+                if last_played == 0:
+                    last_played = None
                 log.info(f'Stats for {game.name}: playtime: {playtime}, last_played: {last_played}')
-                self.game_time_import_success(GameTime(game_id, playtime, last_played))
+                games_playtime[game_id] = GameTime(game_id, playtime, last_played)
 
             except Exception as e:
                 log.error(f"Getting game times for game {game_id} has crashed: " + repr(e))
-                self.game_time_import_failure(game_id, UnknownError())
+                self._game_time_import_failure(game_id, UnknownError())
 
         self.persistent_cache['games_without_stats'] = json.dumps(blacklist)
         self.push_cache()
+        return games_playtime
 
     async def get_unlocked_challenges(self, game_id):
         """Challenges are a unique uplay club feature and don't directly translate to achievements"""
@@ -268,7 +303,7 @@ class UplayPlugin(Plugin):
 
         for game in self.games_collection.get_local_games():
 
-            if (game.space_id == game_id or game.install_id == game_id) and game.status == GameStatus.Installed:
+            if (game.space_id == game_id or game.install_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
                 if game.type == GameType.Steam:
                     if is_steam_installed():
                         url = f"start steam://rungameid/{game.third_party_id}"
@@ -297,21 +332,44 @@ class UplayPlugin(Plugin):
         log.info("Failed to launch game, launching client instead.")
         self.open_uplay_client()
 
-    async def install_game(self, game_id):
+    async def activate_game(self, activation_id):
+        if not await self.client.activate_game(activation_id):
+            log.info(f"Couldnt activate game with id {activation_id}")
+            return
+        log.info(f"Activated game with id {activation_id}")
+        timeout = time.time() + 3
+        while timeout >= time.time():
+            if self.local_client.ownership_changed():
+                # Will refresh informations in collection about the game
+                await self.get_owned_games()
+            await asyncio.sleep(0.1)
+
+    async def install_game(self, game_id, retry=False):
         log.debug(self.games_collection)
         if not self.user_can_perform_actions():
             return
 
         for game in self.games_collection:
-            if game.owned and (game.space_id == game_id or game.install_id == game_id) and game.status in [GameStatus.NotInstalled,
+            game_ids = [game.space_id, game.install_id, game.launch_id]
+            if (game_id in game_ids) and game.owned and game.status in [GameStatus.NotInstalled,
                                                                                            GameStatus.Unknown]:
                 if game.install_id:
                     log.info(f"Installing game: {game_id}, {game}")
                     subprocess.Popen(f"start uplay://install/{game.install_id}", shell=True)
                     return
-            if game.owned and (game.space_id == game_id or game.install_id == game_id) and game.status == GameStatus.Installed:
+            if (game_id in game_ids) and game.status == GameStatus.Installed:
                 log.warning("Game already installed, launching")
                 return await self.launch_game(game_id)
+
+            if (game_id in game_ids) and not game.owned and game.activation_id and not retry:
+                log.warning("Activating game from subscription")
+                if not self.local_client.is_running():
+                    self.open_uplay_client()
+                    timeout = time.time() + 10
+                    while not self.local_client.is_running() and time.time() <= timeout:
+                        await asyncio.sleep(0.1)
+                await self.activate_game(game.activation_id)
+                asyncio.create_task(self.install_game(game_id=game_id, retry=True))
 
         # if launch_id is not known, try to launch local client instead
         self.open_uplay_client()
@@ -387,32 +445,30 @@ class UplayPlugin(Plugin):
             for friend in friends["friends"]
         ]
 
-    async def _shutdown_client(self):
-        log.info("Shutdown platform client called")
+    async def close_uplay(self):
         if self.local_client.is_installed:
             subprocess.Popen("taskkill.exe /im \"upc.exe\"", shell=True)
 
-    async def prevent_uplay_from_showing(self):
+    async def prevent_uplay_from_showing(self, kill_attempt=True):
+        if not self.local_client.is_installed:
+            log.info("Local client not installed")
+            return
         client_popup_wait_time = 5
         check_frequency_delay = 0.02
 
-        hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
         end_time = time.time() + client_popup_wait_time
-
-        if hwnd:
-            try:
-                while not ctypes.windll.user32.IsWindowVisible(hwnd):
-                    if time.time() >= end_time:
-                        log.info("Timed out post close game uplay popup")
-                        break
-                    await asyncio.sleep(check_frequency_delay)
-                    try:
-                        hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
-                    except Exception as e:
-                        log.error(f"exception while retrieving window handle {hwnd} {repr(e)}")
-                await self._shutdown_client()
-            except Exception as e:
-                log.error(f"Exception when checking if window is visible {repr(e)}")
+        hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
+        while not ctypes.windll.user32.IsWindowVisible(hwnd):
+            if time.time() >= end_time:
+                log.info("Timed out post close game uplay popup")
+                break
+            hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
+            await asyncio.sleep(check_frequency_delay)
+        if kill_attempt:
+            await self.close_uplay()
+        else:
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+            ctypes.windll.user32.CloseWindow(hwnd)
 
     def tick(self):
         loop = asyncio.get_event_loop()

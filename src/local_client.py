@@ -6,6 +6,7 @@ import logging as log
 
 if SYSTEM == System.WINDOWS:
     import winreg
+    import ctypes
 
 
 class LocalClient(object):
@@ -55,6 +56,9 @@ class LocalClient(object):
     @property
     def is_installed(self):
         return self._is_installed
+
+    def is_running(self):
+        return ctypes.windll.user32.FindWindowW(None, "Uplay")
 
     @property
     def was_user_logged_in(self):

@@ -91,7 +91,7 @@ def _get_playtime_heuristics(time_stats):
     return time_sum
 
 
-def find_times(statscards: dict, game_id: str=None) -> Tuple[Optional[int], Optional[int]]:
+def find_times(statscards: dict, game_id: str = None) -> Tuple[Optional[int], Optional[int]]:
     """
     result[0] - total_playtime in minutes
     result[1] - last_played as timestamp
@@ -119,4 +119,4 @@ def find_times(statscards: dict, game_id: str=None) -> Tuple[Optional[int], Opti
     if time_stats:
         playtime = _get_playtime_heuristics(time_stats)
 
-    return (playtime, last_played)
+    return playtime, last_played

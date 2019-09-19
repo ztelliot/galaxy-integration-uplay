@@ -30,9 +30,14 @@ class GamesCollection(list):
                     log.debug(f"Extending existing game entry {game_in_list} with space id: {game.space_id}")
                     game_in_list.space_id = game.space_id
                 if game.status is not GameStatus.Unknown and game_in_list.status is GameStatus.Unknown:
+                    log.debug(f"Extending existing game entry {game_in_list} with installation status: {game.status}")
                     game_in_list.status = game.status
-                if game.owned:
+                if game.owned is not None:
+                    log.debug(f"Extending existing game entry {game_in_list} with owned status: {game.owned}")
                     game_in_list.owned = game.owned
+                if game.activation_id:
+                    log.debug(f"Extending existing game entry {game_in_list} with activation_id: {game.activation_id}")
+                    game_in_list.activation_id = game.activation_id
 
     def _add_new_game_entry(self, game, ownership_accessible):
         if ownership_accessible and game.install_id != '':

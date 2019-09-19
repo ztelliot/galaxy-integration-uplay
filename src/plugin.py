@@ -25,7 +25,6 @@ from stats import find_times
 from consts import AUTH_PARAMS, COOKIES
 from games_collection import GamesCollection
 from version import __version__
-from steam import is_steam_installed
 if System.WINDOWS == SYSTEM:
     import ctypes
 
@@ -97,8 +96,7 @@ class UplayPlugin(Plugin):
             subscription_games.append(UbisoftGame(
                             space_id='',
                             launch_id=str(game['uplayGameId']),
-                            install_id='',
-                            third_party_id='',
+                            install_id=str(game['uplayGameId']),
                             name=game['name'],
                             path='',
                             type=GameType.New,
@@ -125,7 +123,6 @@ class UplayPlugin(Plugin):
                                     space_id=game['spaceId'],
                                     launch_id='',
                                     install_id='',
-                                    third_party_id='',
                                     name=game['title'],
                                     path='',
                                     type=GameType.New,
@@ -134,6 +131,8 @@ class UplayPlugin(Plugin):
                                     status=GameStatus.Unknown,
                                     owned=True
                                 ))
+                        else:
+                            log.debug(f"Skipped game from Club Request for {game['platform']}: {game['spaceId']}, {game['title']}")
 
                 self.games_collection.extend(club_games, self.local_client.ownership_accesible())
             except ApplicationError as e:
@@ -190,19 +189,22 @@ class UplayPlugin(Plugin):
             return
 
         for game in self.games_collection:
-            if game.install_id in cached_statuses:
+            try:
+                self.cached_game_statuses[game.install_id]
                 self.game_status_notifier.update_game(game)
                 if game.status != cached_statuses[game.install_id]:
                     log.info(f"Game {game.name} path changed: updating status from {cached_statuses[game.install_id]} to {game.status}")
                     self.update_local_game_status(game.as_local_game())
                     self.cached_game_statuses[game.install_id] = game.status
-            else:
+            except KeyError:
                 self.game_status_notifier.update_game(game)
                 ''' If a game wasn't previously in a cache then and it appears with an installed or running status
                  it most likely means that client was just installed '''
                 if game.status in [GameStatus.Installed, GameStatus.Running]:
                     self.update_local_game_status(game.as_local_game())
                 self.cached_game_statuses[game.install_id] = game.status
+
+
 
     async def get_local_games(self):
         self._parse_local_games()
@@ -304,13 +306,7 @@ class UplayPlugin(Plugin):
         for game in self.games_collection.get_local_games():
 
             if (game.space_id == game_id or game.install_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
-                if game.type == GameType.Steam:
-                    if is_steam_installed():
-                        url = f"start steam://rungameid/{game.third_party_id}"
-                    else:
-                        url = f"start uplay://open/game/{game.launch_id}"
-                elif game.type == GameType.New or game.type == GameType.Legacy:
-                    log.debug('Launching legacy game')
+                if game.type == GameType.New or game.type == GameType.Legacy:
                     self.game_status_notifier._legacy_game_launched = True
                     url = f"start uplay://launch/{game.launch_id}"
                 else:
@@ -412,7 +408,7 @@ class UplayPlugin(Plugin):
         statuses = self.game_status_notifier.statuses
         new_games = []
         for game in self.games_collection:
-            if game.install_id in statuses:
+            try:
                 if statuses[game.install_id] == GameStatus.Installed and game.status in [GameStatus.NotInstalled, GameStatus.Unknown]:
                     log.info(f"updating status for {game.name} to installed from not installed")
                     game.status = GameStatus.Installed
@@ -430,6 +426,8 @@ class UplayPlugin(Plugin):
                     log.info(f"updating status for {game.name} to not installed")
                     game.status = GameStatus.NotInstalled
                     self.update_local_game_status(game.as_local_game())
+            except KeyError:
+                continue
 
             if self.owned_games_sent and not game.considered_for_sending:
                 game.considered_for_sending = True

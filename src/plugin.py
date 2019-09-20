@@ -25,6 +25,7 @@ from stats import find_times
 from consts import AUTH_PARAMS, COOKIES
 from games_collection import GamesCollection
 from version import __version__
+from steam import is_steam_installed
 if System.WINDOWS == SYSTEM:
     import ctypes
 
@@ -97,6 +98,7 @@ class UplayPlugin(Plugin):
                             space_id='',
                             launch_id=str(game['uplayGameId']),
                             install_id=str(game['uplayGameId']),
+                            third_party_id='',
                             name=game['name'],
                             path='',
                             type=GameType.New,
@@ -123,6 +125,7 @@ class UplayPlugin(Plugin):
                                     space_id=game['spaceId'],
                                     launch_id='',
                                     install_id='',
+                                    third_party_id='',
                                     name=game['title'],
                                     path='',
                                     type=GameType.New,
@@ -203,8 +206,6 @@ class UplayPlugin(Plugin):
                 if game.status in [GameStatus.Installed, GameStatus.Running]:
                     self.update_local_game_status(game.as_local_game())
                 self.cached_game_statuses[game.install_id] = game.status
-
-
 
     async def get_local_games(self):
         self._parse_local_games()
@@ -306,7 +307,13 @@ class UplayPlugin(Plugin):
         for game in self.games_collection.get_local_games():
 
             if (game.space_id == game_id or game.install_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
-                if game.type == GameType.New or game.type == GameType.Legacy:
+                if game.type == GameType.Steam:
+                    if is_steam_installed():
+                        url = f"start steam://rungameid/{game.third_party_id}"
+                    else:
+                        url = f"start uplay://open/game/{game.launch_id}"
+                elif game.type == GameType.New or game.type == GameType.Legacy:
+                    log.debug('Launching legacy game')
                     self.game_status_notifier._legacy_game_launched = True
                     url = f"start uplay://launch/{game.launch_id}"
                 else:

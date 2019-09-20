@@ -2,6 +2,7 @@ import math
 import logging as log
 
 from local_helper import get_local_game_path, get_game_installed_status
+from steam import get_steam_game_status
 
 import yaml
 
@@ -180,6 +181,17 @@ class LocalParser(object):
                 game_name = game_yaml['localizations']['default']['GAMENAME']
         return game_name
 
+    def _get_steam_game_properties_from_yaml(self, game_yaml):
+        path = ''
+        third_party_id = ''
+        if 'third_party_steam' in game_yaml['root']['start_game']:
+            path = game_yaml['root']['start_game']['third_party_steam']['game_installation_status_register']
+            third_party_id = game_yaml['root']['start_game']['third_party_steam']['steam_app_id']
+        elif 'steam' in game_yaml['root']['start_game']:
+            path = game_yaml['root']['start_game']['steam']['game_installation_status_register']
+            third_party_id = game_yaml['root']['start_game']['steam']['steam_app_id']
+        return path, third_party_id
+
     def _get_registry_properties_from_yaml(self, game_yaml):
         special_registry_path = ''
         exe = ''
@@ -194,6 +206,7 @@ class LocalParser(object):
     def _parse_game(self, game_yaml, install_id, launch_id):
         path = ''
         space_id = ''
+        third_party_id = ''
         special_registry_path = ''
         status = GameStatus.NotInstalled
         game_type = GameType.New
@@ -207,14 +220,24 @@ class LocalParser(object):
         else:
             game_type = GameType.Legacy
 
-        try:
-            special_registry_path, exe = self._get_registry_properties_from_yaml(game_yaml)
-        except Exception as e:
-            log.info(f"Unable to read registry path for game {launch_id}: {repr(e)}")
+        if 'third_party_platform' in game_yaml['root']:
+            if game_yaml['root']['third_party_platform']['name'].lower() == 'steam':
+                game_type = GameType.Steam
+                path, third_party_id = self._get_steam_game_properties_from_yaml(game_yaml)
+                status = get_steam_game_status(path)
+            elif game_yaml['root']['third_party_platform']['name'].lower() == 'origin':
+                game_type = GameType.Origin
+                path = game_yaml['root']['third_party_platform']['platform_installation_status']['register']
+                # todo status = _return_origin_game_status(path)
+        else:
+            try:
+                special_registry_path, exe = self._get_registry_properties_from_yaml(game_yaml)
+            except Exception as e:
+                log.info(f"Unable to read registry path for game {launch_id}: {repr(e)}")
 
-        path = get_local_game_path(special_registry_path, launch_id)
-        if path:
-            status = get_game_installed_status(path, exe, special_registry_path)
+            path = get_local_game_path(special_registry_path, launch_id)
+            if path:
+                status = get_game_installed_status(path, exe, special_registry_path)
 
         game_name = self._get_game_name_from_yaml(game_yaml)
 
@@ -223,6 +246,7 @@ class LocalParser(object):
             space_id=space_id,
             launch_id=launch_id,
             install_id=install_id,
+            third_party_id=third_party_id,
             name=game_name,
             path=path,
             type=game_type,
@@ -240,8 +264,7 @@ class LocalParser(object):
                 stream = self.configuration_raw[game['offset']: game['offset'] + game['size']].decode("utf8", errors='ignore')
                 if stream and 'start_game' in stream:
                     yaml_object = yaml.load(stream)
-                    if 'third_party_platform' not in yaml_object['root']:
-                        yield self._parse_game(yaml_object, game['install_id'], game['launch_id'])
+                    yield self._parse_game(yaml_object, game['install_id'], game['launch_id'])
 
     def get_owned_local_games(self, ownership_data):
         self.ownership_raw = ownership_data

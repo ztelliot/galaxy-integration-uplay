@@ -2,6 +2,7 @@ import os
 from definitions import System, SYSTEM
 from galaxy.api.types import Cookie
 UBISOFT_REGISTRY = "SOFTWARE\\Ubisoft"
+STEAM_REGISTRY = "Software\\Valve\\Steam"
 UBISOFT_REGISTRY_LAUNCHER = "SOFTWARE\\Ubisoft\\Launcher"
 UBISOFT_REGISTRY_LAUNCHER_INSTALLS = "SOFTWARE\\Ubisoft\\Launcher\\Installs"
 

@@ -7,6 +7,7 @@ from threading import Thread
 import psutil as psutil
 from definitions import UbisoftGame, GameType, GameStatus, ProcessType, WatchedProcess, SYSTEM, System
 
+from steam import get_steam_game_status
 from local_helper import get_local_game_path, get_game_installed_status
 
 
@@ -150,13 +151,16 @@ class GameStatusNotifier(object):
 
     def _get_game_status(self, game, line_list):
         status = None
-        if not game.path:
-            game.path = get_local_game_path(game.special_registry_path, game.launch_id)
+        if game.type == GameType.Steam:
+            status = get_steam_game_status(game.path)
+        else:
+            if not game.path:
+                game.path = get_local_game_path(game.special_registry_path, game.launch_id)
 
-        status = get_game_installed_status(game.path, game.exe, game.special_registry_path)
-        if status == GameStatus.Installed:
-            if self._is_game_running(game, line_list):
-                status = GameStatus.Running
+            status = get_game_installed_status(game.path, game.exe, game.special_registry_path)
+            if status == GameStatus.Installed:
+                if self._is_game_running(game, line_list):
+                    status = GameStatus.Running
         return status
 
     def _process_data(self):

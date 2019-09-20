@@ -22,6 +22,8 @@ elif sys.platform == 'darwin':
 class GameType(EnumMeta):
     New = "New"
     Legacy = "Legacy"
+    Steam = "Steam"
+    Origin = "Origin"
 
 
 class GameStatus(EnumMeta):
@@ -49,6 +51,7 @@ class UbisoftGame(object):
     space_id: str
     launch_id: str
     install_id: str
+    third_party_id: str
     name: str
     path: str
     type: GameType

@@ -86,7 +86,7 @@ class UplayPlugin(Plugin):
             game.considered_for_sending = True
 
         return [game.as_galaxy_game() for game in self.games_collection
-                if game.owned or game.activation_id]
+                if game.owned]
 
     async def _parse_subscription_games(self):
         subscription_games = []

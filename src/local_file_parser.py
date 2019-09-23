@@ -226,8 +226,9 @@ class LocalParser(object):
                 path, third_party_id = self._get_steam_game_properties_from_yaml(game_yaml)
                 status = get_steam_game_status(path)
             elif game_yaml['root']['third_party_platform']['name'].lower() == 'origin':
-                game_type = GameType.Origin
-                path = game_yaml['root']['third_party_platform']['platform_installation_status']['register']
+                log.info(f"Origin game found {game_yaml}")
+                # game_type = GameType.Origin
+                # path = game_yaml['root']['third_party_platform']['platform_installation_status']['register']
                 # todo status = _return_origin_game_status(path)
         else:
             try:

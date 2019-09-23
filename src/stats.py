@@ -88,6 +88,9 @@ def _get_playtime_heuristics(time_stats):
     if type(time_sum) == float:
         time_sum = round(time_sum)
 
+    if time_sum and time_sum <= 0:
+        time_sum = 0
+
     return time_sum
 
 

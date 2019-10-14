@@ -88,9 +88,6 @@ def _get_playtime_heuristics(time_stats):
     if type(time_sum) == float:
         time_sum = round(time_sum)
 
-    if time_sum and time_sum <= 0:
-        time_sum = 0
-
     return time_sum
 
 
@@ -121,5 +118,13 @@ def find_times(statscards: dict, game_id: str = None) -> Tuple[Optional[int], Op
 
     if time_stats:
         playtime = _get_playtime_heuristics(time_stats)
+
+    # +1 hour for forhonor
+    if game_id == '882ad5b5-f549-44a1-a434-c465d22fe4bf':
+        if playtime is not None:
+            playtime += 60
+
+    if playtime and playtime <= 0:
+        playtime = 0
 
     return playtime, last_played

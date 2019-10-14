@@ -42,6 +42,7 @@ class UplayPlugin(Plugin):
         self.updating_games = False
         self.owned_games_sent = False
         self.parsing_club_games = False
+        self.parsed_local_games = False
 
     def auth_lost(self):
         self.lost_authentication()
@@ -108,7 +109,7 @@ class UplayPlugin(Plugin):
                             owned=game['ownership'],
                             activation_id=str(game['id'])
                         ))
-        self.games_collection.extend(subscription_games, self.local_client.ownership_accesible())
+        self.games_collection.extend(subscription_games)
 
     async def _parse_club_games(self):
         if not self.parsing_club_games:
@@ -137,7 +138,7 @@ class UplayPlugin(Plugin):
                         else:
                             log.debug(f"Skipped game from Club Request for {game['platform']}: {game['spaceId']}, {game['title']}")
 
-                self.games_collection.extend(club_games, self.local_client.ownership_accesible())
+                self.games_collection.extend(club_games)
             except ApplicationError as e:
                 log.error(f"Encountered exception while parsing club games {repr(e)}")
                 raise e
@@ -156,13 +157,12 @@ class UplayPlugin(Plugin):
         means that a game was added through the get_club_titles request but its space id
         was not present in configuration file and we couldn't find a matching launch id for it."""
         try:
-            if self.local_client.configurations_accessible():
-                configuration_data = self.local_client.read_config()
-                p = LocalParser()
-                games = []
-                for game in p.parse_games(configuration_data):
-                    games.append(game)
-                self.games_collection.extend(games, self.local_client.ownership_accesible())
+            configuration_data = self.local_client.read_config()
+            p = LocalParser()
+            games = []
+            for game in p.parse_games(configuration_data):
+                games.append(game)
+            self.games_collection.extend(games)
         except scanner.ScannerError as e:
             log.error(f"Scanner error while parsing configuration, yaml is probably corrupted {repr(e)}")
 
@@ -217,6 +217,7 @@ class UplayPlugin(Plugin):
             if game.status == GameStatus.Installed or game.status == GameStatus.Running:
                 local_games.append(game.as_local_game())
         self._update_local_games_status()
+        self.parsed_local_games = True
         return local_games
 
     async def _add_new_games(self, games):
@@ -301,11 +302,12 @@ class UplayPlugin(Plugin):
                 ]
 
     async def launch_game(self, game_id):
-        if not self.user_can_perform_actions():
+        if not self.parsed_local_games:
+            await self.get_local_games()
+        elif not self.user_can_perform_actions():
             return
 
         for game in self.games_collection.get_local_games():
-
             if (game.space_id == game_id or game.install_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
                 if game.type == GameType.Steam:
                     if is_steam_installed():
@@ -313,7 +315,7 @@ class UplayPlugin(Plugin):
                     else:
                         url = f"start uplay://open/game/{game.launch_id}"
                 elif game.type == GameType.New or game.type == GameType.Legacy:
-                    log.debug('Launching legacy game')
+                    log.debug('Launching game')
                     self.game_status_notifier._legacy_game_launched = True
                     url = f"start uplay://launch/{game.launch_id}"
                 else:

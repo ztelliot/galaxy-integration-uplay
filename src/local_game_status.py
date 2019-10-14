@@ -139,11 +139,14 @@ class GameStatusNotifier(object):
         line_list = []
         if self.launcher_log_path:
             try:
-                with open(self.launcher_log_path, "r") as fh:
+                with open(self.launcher_log_path, "r", errors='ignore') as fh:
                     line_list = fh.readlines()
                     line_list = line_list[-number_of_lines:]
             except FileNotFoundError:
                 pass
+            except UnicodeDecodeError:
+                log.warning(
+                    f"Can't read launcher log at {self.launcher_log_path}, UnicodeDecodeError when reading log lines")
             except Exception as e:
                 log.warning(
                     f"Can't read launcher log at {self.launcher_log_path}, unable to read running games statuses: {repr(e)}")

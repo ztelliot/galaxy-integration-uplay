@@ -39,21 +39,7 @@ class GamesCollection(list):
                     log.debug(f"Extending existing game entry {game_in_list} with activation_id: {game.activation_id}")
                     game_in_list.activation_id = game.activation_id
 
-    def _add_new_game_entry(self, game, ownership_accessible):
-        if ownership_accessible and game.install_id != '':
-            log.info(
-                f"Adding new game to games collection {game.name} with space_id: {game.space_id} and install_id/launch_id: {game.install_id}/{game.launch_id}")
-            super().append(game)
-        elif not ownership_accessible and game.install_id == '':
-            log.info(
-                f"Adding new game to games collection {game.name} with space_id: {game.space_id} and ownership file is missing")
-            super().append(game)
-        elif game.activation_id != '':
-            log.info(
-                f"Adding an unactivated game from active subscription to games collection {game.name}")
-            super().append(game)
-
-    def extend(self, games, ownership_accessible=False):
+    def extend(self, games):
         spaces = set([game.space_id for game in self if game.space_id])
         installs = set([game.install_id for game in self if game.install_id])
         launches = set([game.launch_id for game in self if game.launch_id])
@@ -62,7 +48,8 @@ class GamesCollection(list):
             if game.space_id not in spaces and game.install_id not in installs and (game.launch_id not in launches and game.launch_id not in installs):
                 if game.space_id:
                     spaces.add(game.space_id)
-                self._add_new_game_entry(game, ownership_accessible)
+                log.info(f"Adding new game to collection {game.name} {game.space_id} {game.launch_id}/{game.install_id}")
+                super().append(game)
             elif game.space_id in spaces or game.install_id in installs or game.launch_id in launches or game.launch_id in installs:
                 self._extend_existing_game_entry(game)
 

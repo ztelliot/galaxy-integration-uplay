@@ -76,7 +76,7 @@ class BackendClient():
         result = {}
         try:
             refresh_needed = False
-            if not self.refresh_token:
+            if self.refresh_token:
                 log.debug(f'rememberMeTicket expiration time: {str(self.refresh_time)}')
                 refresh_needed = self.refresh_time is None or datetime.now() > datetime.fromtimestamp(int(self.refresh_time))
             if refresh_needed:
@@ -88,6 +88,8 @@ class BackendClient():
                 except (AccessDenied, AuthenticationRequired):
                     # fallback for another reason than expired time or wrong calculation due to changing time zones
                     log.debug('Fallback refresh')
+                    if not self.refresh_token:
+                        log.warning("No refresh token present, possibly unchecked remember me when connecting plugin")
                     await self._refresh_auth()
                     result = await self._do_request(method, *args, **kwargs)
         except (AccessDenied, AuthenticationRequired) as e:
@@ -115,6 +117,9 @@ class BackendClient():
         else:
             self.__refresh_in_progress = True
             try:
+                await self._refresh_ticket()
+                self._plugin.store_credentials(self.get_credentials())
+            except:
                 await self._refresh_remember_me()
                 await self._refresh_ticket()
                 self._plugin.store_credentials(self.get_credentials())
@@ -215,7 +220,6 @@ class BackendClient():
                 user_data[cookie['name']] = cookie['value']
         user_data['userId'] = user_data.pop('user_id')
         user_data['username'] = user_data.pop('user_name')
-
         self.restore_credentials(user_data)
         await self.post_sessions()
         self._plugin.store_credentials(self.get_credentials())

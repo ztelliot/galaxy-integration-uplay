@@ -44,7 +44,8 @@ class LocalClient(object):
         try:
             with open(filepath, 'rb') as f:
                 return f.read()
-        except FileExistsError:
+        except (FileExistsError, OSError, IOError) as e:
+            log.warning(f'file not found [{e}]')
             return None
 
     def read_config(self):

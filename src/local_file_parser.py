@@ -131,23 +131,24 @@ class LocalParser(object):
         configuration_content = self.configuration_raw
         global_offset = 0
         records = {}
-        try:
-            while global_offset < len(configuration_content):
-                data = configuration_content[global_offset:]
-                object_size, install_id, launch_id, header_size = self._parse_configuration_header(data)
+        if configuration_content:
+            try:
+                while global_offset < len(configuration_content):
+                    data = configuration_content[global_offset:]
+                    object_size, install_id, launch_id, header_size = self._parse_configuration_header(data)
 
-                launch_id = install_id if launch_id == 0 or launch_id == install_id else launch_id
+                    launch_id = install_id if launch_id == 0 or launch_id == install_id else launch_id
 
-                if object_size > 500:
-                    records[install_id] = {'size': object_size, 'offset': global_offset + header_size, 'install_id': install_id, 'launch_id': launch_id}
-                global_offset_tmp = global_offset
-                global_offset += object_size + header_size
+                    if object_size > 500:
+                        records[install_id] = {'size': object_size, 'offset': global_offset + header_size, 'install_id': install_id, 'launch_id': launch_id}
+                    global_offset_tmp = global_offset
+                    global_offset += object_size + header_size
 
-                if global_offset < len(configuration_content) and configuration_content[global_offset] != 0x0A:
-                    object_size, _, _, header_size = self._parse_configuration_header(data, True)
-                    global_offset = global_offset_tmp + object_size + header_size
-        except:
-            log.exception("parse_configuration failed with exception. Possibly 'configuration' file corrupted")
+                    if global_offset < len(configuration_content) and configuration_content[global_offset] != 0x0A:
+                        object_size, _, _, header_size = self._parse_configuration_header(data, True)
+                        global_offset = global_offset_tmp + object_size + header_size
+            except:
+                log.exception("parse_configuration failed with exception. Possibly 'configuration' file corrupted")
         return records
 
     def _parse_ownership(self):

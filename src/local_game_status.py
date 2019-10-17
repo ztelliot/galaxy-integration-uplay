@@ -1,6 +1,7 @@
 import time
 import logging as log
 import re
+from file_read_backwards import FileReadBackwards
 
 from threading import Thread
 
@@ -9,6 +10,7 @@ from definitions import UbisoftGame, GameType, GameStatus, ProcessType, WatchedP
 
 from steam import get_steam_game_status
 from local_helper import get_local_game_path, get_game_installed_status
+
 
 
 class ProcessWatcher(object):
@@ -139,9 +141,8 @@ class GameStatusNotifier(object):
         line_list = []
         if self.launcher_log_path:
             try:
-                with open(self.launcher_log_path, "r", errors='ignore') as fh:
-                    line_list = fh.readlines()
-                    line_list = line_list[-number_of_lines:]
+                with FileReadBackwards(self.launcher_log_path, encoding="utf-8") as fh:
+                    [line_list.append(fh.readline()) for _ in range(number_of_lines)]
             except FileNotFoundError:
                 pass
             except UnicodeDecodeError:
@@ -150,7 +151,8 @@ class GameStatusNotifier(object):
             except Exception as e:
                 log.warning(
                     f"Can't read launcher log at {self.launcher_log_path}, unable to read running games statuses: {repr(e)}")
-        return line_list
+
+        return line_list[::-1]
 
     def _get_game_status(self, game, line_list):
         status = None
@@ -169,12 +171,14 @@ class GameStatusNotifier(object):
     def _process_data(self):
         statuses = self.statuses
         while True:
-            line_list = self._get_launcher_log_lines(50)
-            try:
-                for install_id, game in self.games.items():
-                    statuses[install_id] = self._get_game_status(game, line_list)
-            except Exception as e:
-                log.error(f"Process data error {repr(e)}")
-            finally:
-                time.sleep(1)
-            self.statuses = statuses
+            line_list = self._get_launcher_log_lines(20)
+            if line_list:
+                try:
+                    for install_id, game in self.games.items():
+                        statuses[install_id] = self._get_game_status(game, line_list)
+                except Exception as e:
+                    log.error(f"Process data error {repr(e)}")
+                self.statuses = statuses
+
+            time.sleep(1)
+

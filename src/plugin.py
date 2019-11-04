@@ -20,13 +20,14 @@ from backend import BackendClient
 from local_client import LocalClient
 from local_file_parser import LocalParser
 from local_game_status import ProcessWatcher, GameStatusNotifier
-from definitions import GameStatus, System, SYSTEM, UbisoftGame, GameType
+from definitions import GameStatus, UbisoftGame, GameType, System, SYSTEM
 from stats import find_times
 from consts import AUTH_PARAMS, COOKIES
 from games_collection import GamesCollection
 from version import __version__
 from steam import is_steam_installed
-if System.WINDOWS == SYSTEM:
+
+if SYSTEM == System.WINDOWS:
     import ctypes
 
 class UplayPlugin(Plugin):
@@ -75,8 +76,9 @@ class UplayPlugin(Plugin):
         if not self.client.is_authenticated():
             raise AuthenticationRequired()
 
-        self._parse_local_games()
-        self._parse_local_game_ownership()
+        if SYSTEM == System.WINDOWS:
+            self._parse_local_games()
+            self._parse_local_game_ownership()
 
         await self._parse_club_games()
         await self._parse_subscription_games()
@@ -193,7 +195,6 @@ class UplayPlugin(Plugin):
 
         for game in self.games_collection:
             try:
-                self.cached_game_statuses[game.install_id]
                 self.game_status_notifier.update_game(game)
                 if game.status != cached_statuses[game.install_id]:
                     log.info(f"Game {game.name} path changed: updating status from {cached_statuses[game.install_id]} to {game.status}")
@@ -207,18 +208,19 @@ class UplayPlugin(Plugin):
                     self.update_local_game_status(game.as_local_game())
                 self.cached_game_statuses[game.install_id] = game.status
 
-    async def get_local_games(self):
-        self._parse_local_games()
+    if SYSTEM == System.WINDOWS:
+        async def get_local_games(self):
+            self._parse_local_games()
 
-        local_games = []
+            local_games = []
 
-        for game in self.games_collection:
-            self.cached_game_statuses[game.launch_id] = game.status
-            if game.status == GameStatus.Installed or game.status == GameStatus.Running:
-                local_games.append(game.as_local_game())
-        self._update_local_games_status()
-        self.parsed_local_games = True
-        return local_games
+            for game in self.games_collection:
+                self.cached_game_statuses[game.launch_id] = game.status
+                if game.status == GameStatus.Installed or game.status == GameStatus.Running:
+                    local_games.append(game.as_local_game())
+            self._update_local_games_status()
+            self.parsed_local_games = True
+            return local_games
 
     async def _add_new_games(self, games):
         await self._parse_club_games()
@@ -301,41 +303,42 @@ class UplayPlugin(Plugin):
                     for challenge in challenges["actions"] if challenge["isCompleted"] and not challenge["isBadge"]
                 ]
 
-    async def launch_game(self, game_id):
-        if not self.parsed_local_games:
-            await self.get_local_games()
-        elif not self.user_can_perform_actions():
-            return
-
-        for game in self.games_collection.get_local_games():
-            if (game.space_id == game_id or game.install_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
-                if game.type == GameType.Steam:
-                    if is_steam_installed():
-                        url = f"start steam://rungameid/{game.third_party_id}"
-                    else:
-                        url = f"start uplay://open/game/{game.launch_id}"
-                elif game.type == GameType.New or game.type == GameType.Legacy:
-                    log.debug('Launching game')
-                    self.game_status_notifier._legacy_game_launched = True
-                    url = f"start uplay://launch/{game.launch_id}"
-                else:
-                    log.error(f"Unsupported game type {game.name}")
-                    self.open_uplay_client()
-                    return
-
-                log.info(f"Launching game '{game.name}' by protocol: [{url}]")
-
-                subprocess.Popen(url, shell=True)
+    if SYSTEM == System.WINDOWS:
+        async def launch_game(self, game_id):
+            if not self.parsed_local_games:
+                await self.get_local_games()
+            elif not self.user_can_perform_actions():
                 return
 
-        for game in self.games_collection:
-            if (game.space_id == game_id or game.install_id == game_id) and game.status in [GameStatus.NotInstalled,
-                                                                                            GameStatus.Unknown]:
-                log.warning("Game is not installed, installing")
-                return await self.install_game(game_id)
+            for game in self.games_collection.get_local_games():
+                if (game.space_id == game_id or game.install_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
+                    if game.type == GameType.Steam:
+                        if is_steam_installed():
+                            url = f"start steam://rungameid/{game.third_party_id}"
+                        else:
+                            url = f"start uplay://open/game/{game.launch_id}"
+                    elif game.type == GameType.New or game.type == GameType.Legacy:
+                        log.debug('Launching game')
+                        self.game_status_notifier._legacy_game_launched = True
+                        url = f"start uplay://launch/{game.launch_id}"
+                    else:
+                        log.error(f"Unsupported game type {game.name}")
+                        self.open_uplay_client()
+                        return
 
-        log.info("Failed to launch game, launching client instead.")
-        self.open_uplay_client()
+                    log.info(f"Launching game '{game.name}' by protocol: [{url}]")
+
+                    subprocess.Popen(url, shell=True)
+                    return
+
+            for game in self.games_collection:
+                if (game.space_id == game_id or game.install_id == game_id) and game.status in [GameStatus.NotInstalled,
+                                                                                                GameStatus.Unknown]:
+                    log.warning("Game is not installed, installing")
+                    return await self.install_game(game_id)
+
+            log.info("Failed to launch game, launching client instead.")
+            self.open_uplay_client()
 
     async def activate_game(self, activation_id):
         if not await self.client.activate_game(activation_id):
@@ -349,50 +352,52 @@ class UplayPlugin(Plugin):
                 await self.get_owned_games()
             await asyncio.sleep(0.1)
 
-    async def install_game(self, game_id, retry=False):
-        log.debug(self.games_collection)
-        if not self.user_can_perform_actions():
-            return
-
-        for game in self.games_collection:
-            game_ids = [game.space_id, game.install_id, game.launch_id]
-            if (game_id in game_ids) and game.owned and game.status in [GameStatus.NotInstalled,
-                                                                                           GameStatus.Unknown]:
-                if game.install_id:
-                    log.info(f"Installing game: {game_id}, {game}")
-                    subprocess.Popen(f"start uplay://install/{game.install_id}", shell=True)
-                    return
-            if (game_id in game_ids) and game.status == GameStatus.Installed:
-                log.warning("Game already installed, launching")
-                return await self.launch_game(game_id)
-
-            if (game_id in game_ids) and not game.owned and game.activation_id and not retry:
-                log.warning("Activating game from subscription")
-                if not self.local_client.is_running():
-                    self.open_uplay_client()
-                    timeout = time.time() + 10
-                    while not self.local_client.is_running() and time.time() <= timeout:
-                        await asyncio.sleep(0.1)
-                await self.activate_game(game.activation_id)
-                asyncio.create_task(self.install_game(game_id=game_id, retry=True))
-
-        # if launch_id is not known, try to launch local client instead
-        self.open_uplay_client()
-        log.info(
-            f"Did not found game with game_id: {game_id}, proper launch_id and NotInstalled status, launching client.")
-
-    async def uninstall_game(self, game_id):
-        if not self.user_can_perform_actions():
-            return
-
-        for game in self.games_collection.get_local_games():
-            if (game.space_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
-                subprocess.Popen(f"start uplay://uninstall/{game.launch_id}", shell=True)
+    if SYSTEM == System.WINDOWS:
+        async def install_game(self, game_id, retry=False):
+            log.debug(self.games_collection)
+            if not self.user_can_perform_actions():
                 return
 
-        self.open_uplay_client()
-        log.info(
-            f"Did not found game with game_id: {game_id}, proper launch_id and Installed status, launching client.")
+            for game in self.games_collection:
+                game_ids = [game.space_id, game.install_id, game.launch_id]
+                if (game_id in game_ids) and game.owned and game.status in [GameStatus.NotInstalled,
+                                                                                               GameStatus.Unknown]:
+                    if game.install_id:
+                        log.info(f"Installing game: {game_id}, {game}")
+                        subprocess.Popen(f"start uplay://install/{game.install_id}", shell=True)
+                        return
+                if (game_id in game_ids) and game.status == GameStatus.Installed:
+                    log.warning("Game already installed, launching")
+                    return await self.launch_game(game_id)
+
+                if (game_id in game_ids) and not game.owned and game.activation_id and not retry:
+                    log.warning("Activating game from subscription")
+                    if not self.local_client.is_running():
+                        self.open_uplay_client()
+                        timeout = time.time() + 10
+                        while not self.local_client.is_running() and time.time() <= timeout:
+                            await asyncio.sleep(0.1)
+                    await self.activate_game(game.activation_id)
+                    asyncio.create_task(self.install_game(game_id=game_id, retry=True))
+
+            # if launch_id is not known, try to launch local client instead
+            self.open_uplay_client()
+            log.info(
+                f"Did not found game with game_id: {game_id}, proper launch_id and NotInstalled status, launching client.")
+
+    if SYSTEM == System.WINDOWS:
+        async def uninstall_game(self, game_id):
+            if not self.user_can_perform_actions():
+                return
+
+            for game in self.games_collection.get_local_games():
+                if (game.space_id == game_id or game.launch_id == game_id) and game.status == GameStatus.Installed:
+                    subprocess.Popen(f"start uplay://uninstall/{game.launch_id}", shell=True)
+                    return
+
+            self.open_uplay_client()
+            log.info(
+                f"Did not found game with game_id: {game_id}, proper launch_id and Installed status, launching client.")
 
     def user_can_perform_actions(self):
         if not self.local_client.is_installed:

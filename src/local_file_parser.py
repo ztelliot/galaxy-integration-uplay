@@ -1,14 +1,12 @@
 import math
 import logging as log
+import yaml
 
 from local_helper import get_local_game_path, get_game_installed_status
 from steam import get_steam_game_status
-
-import yaml
-
 from consts import UBISOFT_CONFIGURATIONS_BLACKLISTED_NAMES
-
 from definitions import UbisoftGame, GameType, GameStatus
+
 
 class LocalParser(object):
     def __init__(self):
@@ -270,7 +268,7 @@ class LocalParser(object):
             if game['size']:
                 stream = self.configuration_raw[game['offset']: game['offset'] + game['size']].decode("utf8", errors='ignore')
                 if stream and 'start_game' in stream:
-                    yaml_object = yaml.load(stream)
+                    yaml_object = yaml.load(stream.replace('\t', ' '))
                     yield self._parse_game(yaml_object, game['install_id'], game['launch_id'])
 
     def get_owned_local_games(self, ownership_data):

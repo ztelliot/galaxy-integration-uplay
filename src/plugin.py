@@ -14,7 +14,7 @@ from galaxy.api.consts import Platform
 from galaxy.api.jsonrpc import ApplicationError
 from galaxy.api.errors import InvalidCredentials, AuthenticationRequired, AccessDenied, UnknownError
 from galaxy.api.plugin import Plugin, create_and_run_plugin
-from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo
+from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo, GameLibrarySettings
 
 from backend import BackendClient
 from local_client import LocalClient
@@ -169,7 +169,7 @@ class UplayPlugin(Plugin):
             log.error(f"Scanner error while parsing configuration, yaml is probably corrupted {repr(e)}")
 
     def _parse_local_game_ownership(self):
-        if self.local_client.ownership_accesible():
+        if self.local_client.ownership_accessible():
             ownership_data = self.local_client.read_ownership()
             p = LocalParser()
             ownership_records = p.get_owned_local_games(ownership_data)
@@ -457,30 +457,72 @@ class UplayPlugin(Plugin):
             for friend in friends["friends"]
         ]
 
-    async def close_uplay(self):
-        if self.local_client.is_installed:
-            subprocess.Popen("taskkill.exe /im \"upc.exe\"", shell=True)
+    if SYSTEM == System.WINDOWS:
+        async def launch_platform_client(self):
+            if self.local_client.is_running():
+                log.info("Launch platform client called but Uplay is already running")
+                return
+            url = f"start uplay://"
+            subprocess.Popen(url, shell=True)
+            # Uplay tries to get focus a couple of times when being launched
+            end_time = time.time() + 15
+            while time.time() <= end_time:
+                await self.prevent_uplay_from_showing(kill_attempt=False)
+                await asyncio.sleep(0.05)
 
-    async def prevent_uplay_from_showing(self, kill_attempt=True):
-        if not self.local_client.is_installed:
-            log.info("Local client not installed")
-            return
-        client_popup_wait_time = 5
-        check_frequency_delay = 0.02
+    if SYSTEM == System.WINDOWS:
+        async def shutdown_platform_client(self):
+            if self.local_client.is_installed:
+                subprocess.Popen("taskkill.exe /im \"upc.exe\"", shell=True)
 
-        end_time = time.time() + client_popup_wait_time
-        hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
-        while not ctypes.windll.user32.IsWindowVisible(hwnd):
-            if time.time() >= end_time:
-                log.info("Timed out post close game uplay popup")
-                break
+    if SYSTEM == System.WINDOWS:
+        async def prevent_uplay_from_showing(self, kill_attempt=True):
+            if not self.local_client.is_installed:
+                log.info("Local client not installed")
+                return
+            client_popup_wait_time = 5
+            check_frequency_delay = 0.02
+
+            end_time = time.time() + client_popup_wait_time
             hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
-            await asyncio.sleep(check_frequency_delay)
-        if kill_attempt:
-            await self.close_uplay()
-        else:
-            ctypes.windll.user32.SetForegroundWindow(hwnd)
-            ctypes.windll.user32.CloseWindow(hwnd)
+            while not ctypes.windll.user32.IsWindowVisible(hwnd):
+                if time.time() >= end_time:
+                    log.info("Timed out post close game uplay popup")
+                    break
+                hwnd = ctypes.windll.user32.FindWindowW(None, "Uplay")
+                await asyncio.sleep(check_frequency_delay)
+            if kill_attempt:
+                await self.shutdown_platform_client()
+            else:
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+                ctypes.windll.user32.CloseWindow(hwnd)
+
+    if SYSTEM == System.WINDOWS:
+        async def prepare_game_library_settings_context(self, game_ids):
+            if self.local_client.settings_accessible():
+                library_context = {}
+                settings_data = self.local_client.read_settings()
+                parser = LocalParser()
+                favorite_games, hidden_games = parser.get_game_tags(settings_data)
+                for game_id in game_ids:
+                    try:
+                        game = self.games_collection[game_id]
+                    except KeyError:
+                        continue
+                    library_context[game_id] = {'favorite': game.launch_id in favorite_games, 'hidden': game.launch_id in hidden_games}
+                return library_context
+            return None
+
+        async def get_game_library_settings(self, game_id, context):
+            log.debug(f"Context {context}")
+            if not context:
+                # Unable to retrieve context
+                return GameLibrarySettings(game_id, None, None)
+            game_library_settings = context.get(game_id)
+            if game_library_settings is None:
+                # Able to retrieve context but game is not in its values -> It doesnt have any tags or hidden status set
+                return GameLibrarySettings(game_id, [], False)
+            return GameLibrarySettings(game_id, ['favorite'] if game_library_settings['favorite'] else [], game_library_settings['hidden'])
 
     def tick(self):
         loop = asyncio.get_event_loop()
@@ -498,9 +540,9 @@ class UplayPlugin(Plugin):
                         loop.run_in_executor(None, self._update_games)
         return
 
-    def shutdown(self):
+    async def shutdown(self):
         log.info("Plugin shutdown.")
-        asyncio.create_task(self.client.close())
+        await self.client.close()
 
 def main():
     multiprocessing.freeze_support()

@@ -4,14 +4,16 @@ import yaml
 
 from local_helper import get_local_game_path, get_game_installed_status
 from steam import get_steam_game_status
-from consts import UBISOFT_CONFIGURATIONS_BLACKLISTED_NAMES
-from definitions import UbisoftGame, GameType, GameStatus
 
+from consts import UBISOFT_CONFIGURATIONS_BLACKLISTED_NAMES
+
+from definitions import UbisoftGame, GameType, GameStatus
 
 class LocalParser(object):
     def __init__(self):
         self.configuration_raw = None
         self.ownership_raw = None
+        self.settings_raw = None
         self.parsed_games = None
 
     def _convert_data(self, data):
@@ -169,6 +171,76 @@ class LocalParser(object):
             return []
         return records
 
+    def _parse_user_settings(self):
+        def get_game_id(data, rec_size):
+            i = 0
+            multiplier = 1
+            game_id = 0
+            while i < rec_size:
+                game_id += data[i] * multiplier
+                multiplier *= 256
+                i += 1
+
+            if game_id > 256 * 256:
+                game_id -= (128 * 256 * math.ceil(game_id / (256 * 256)))
+                game_id -= (128 * math.ceil(game_id / 256))
+            else:
+                if game_id > 256:
+                    game_id -= (128 * math.ceil(game_id / 256))
+
+            return str(game_id)
+        """
+            0Ah - file start
+            0Ah - hidden games records
+                00h -> no hidden games
+                !00h -> hidden games (hidden games total entry size)
+                    0Ah - SEPARATOR
+                    03h - RECORD SIZE
+                    08h - SEPARATOR
+                    [RECORD_SIZE-1] -> game_ID in konrad's format
+                    [..]
+            12h -> fav games records 
+                00h -> no fav games
+                !00h -> fav games (fav games total entry size)
+                    0Ah - SEPARATOR
+                    03h - RECORD SIZE
+                    08h - SEPARATOR
+                    [RECORD_SIZE-1] -> game_ID in konrad's format
+                    [..]
+        """
+        global_offset = 1
+        fav = set()
+        hidden = set()
+        data = self.settings_raw
+        if data[global_offset] != 0:
+            buffer = int(data[global_offset])
+            fav_records = data[global_offset + 1:global_offset + buffer + 1]
+        else:
+            fav_records = []
+
+        global_offset = len(fav_records) + 3
+        if data[global_offset] != 0:
+            buffer = int(data[global_offset])
+            hidden_records = data[global_offset + 1:global_offset + buffer + 1]
+        else:
+            hidden_records = []
+
+        pos = 0
+        while pos < len(fav_records):
+            rec_size = fav_records[pos + 1] - 1
+            rec_data = fav_records[pos + 3:pos + 3 + rec_size]
+            fav.add(get_game_id(rec_data, rec_size))
+            pos += rec_size + 3
+
+        pos = 0
+        while pos < len(hidden_records):
+            rec_size = hidden_records[pos + 1] - 1
+            rec_data = hidden_records[pos + 3:pos + 3 + rec_size]
+            hidden.add(get_game_id(rec_data, rec_size))
+            pos += rec_size + 3
+
+        return fav, hidden
+
     def _get_game_name_from_yaml(self, game_yaml):
         game_name = ''
 
@@ -268,9 +340,13 @@ class LocalParser(object):
             if game['size']:
                 stream = self.configuration_raw[game['offset']: game['offset'] + game['size']].decode("utf8", errors='ignore')
                 if stream and 'start_game' in stream:
-                    yaml_object = yaml.load(stream.replace('\t', ' '))
+                    yaml_object = yaml.load(stream.replace('\t',' '))
                     yield self._parse_game(yaml_object, game['install_id'], game['launch_id'])
 
     def get_owned_local_games(self, ownership_data):
         self.ownership_raw = ownership_data
         return self._parse_ownership()
+
+    def get_game_tags(self, settings_data):
+        self.settings_raw = settings_data
+        return self._parse_user_settings()

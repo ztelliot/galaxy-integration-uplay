@@ -14,6 +14,7 @@ class LocalClient(object):
         self.last_modification_times = None
         self.configurations_path = None
         self.ownership_path = None
+        self.settings_path = None
         self.launcher_log_path = None
         self.user_id = None
         self._is_installed = None
@@ -28,11 +29,17 @@ class LocalClient(object):
         # Start tracking ownership file if exists
         self.ownership_changed()
 
-    def ownership_accesible(self):
+    def ownership_accessible(self):
         if self.ownership_path is None:
             return False
         else:
             return os.access(self.ownership_path, os.R_OK)
+
+    def settings_accessible(self):
+        if self.settings_path is None:
+            return False
+        else:
+            return os.access(self.settings_path, os.R_OK)
 
     def configurations_accessible(self):
         if self.configurations_path is None:
@@ -53,6 +60,9 @@ class LocalClient(object):
 
     def read_ownership(self):
         return self.__read_file(self.ownership_path)
+
+    def read_settings(self):
+        return self.__read_file(self.settings_path)
 
     @property
     def is_installed(self):
@@ -89,12 +99,14 @@ class LocalClient(object):
             self.launcher_log_path = os.path.join(path, "logs", "launcher_log.txt")
             if self.user_id is not None:
                 self.ownership_path = os.path.join(path, "cache", "ownership", self.user_id)
+                self.settings_path = os.path.join(path, "cache", "settings", self.user_id)
         else:
             if self._is_installed:
                 log.info('Local client uninstalled')
                 self._is_installed = False
             self.configurations_path = None
             self.ownership_path = None
+            self.settings_path = None
             self.launcher_log_path = None
 
     def ownership_changed(self):

@@ -158,15 +158,16 @@ class UplayPlugin(Plugin):
         A game in the games_collection which doesn't have a launch id probably
         means that a game was added through the get_club_titles request but its space id
         was not present in configuration file and we couldn't find a matching launch id for it."""
-        try:
-            configuration_data = self.local_client.read_config()
-            p = LocalParser()
-            games = []
-            for game in p.parse_games(configuration_data):
-                games.append(game)
-            self.games_collection.extend(games)
-        except scanner.ScannerError as e:
-            log.error(f"Scanner error while parsing configuration, yaml is probably corrupted {repr(e)}")
+        if self.local_client.configurations_accessible():
+            try:
+                configuration_data = self.local_client.read_config()
+                p = LocalParser()
+                games = []
+                for game in p.parse_games(configuration_data):
+                    games.append(game)
+                self.games_collection.extend(games)
+            except scanner.ScannerError as e:
+                log.error(f"Scanner error while parsing configuration, yaml is probably corrupted {repr(e)}")
 
     def _parse_local_game_ownership(self):
         if self.local_client.ownership_accessible():

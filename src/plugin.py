@@ -81,7 +81,10 @@ class UplayPlugin(Plugin):
             self._parse_local_game_ownership()
 
         await self._parse_club_games()
-        await self._parse_subscription_games()
+        try:
+            await self._parse_subscription_games()
+        except Exception as e:
+            log.warning(f"Parsing subscriptions failed, most likely account without subscription {repr(e)}")
 
         self.owned_games_sent = True
 

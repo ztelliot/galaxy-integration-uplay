@@ -1,12 +1,12 @@
 {
-    "tag_name": "v0.51",
+    "tag_name": "v0.52",
     "assets": [
         {
-            "browser_download_url": "https://github.com/FriendsOfGalaxy/galaxy-integration-uplay/releases/download/v0.51/windows.zip",
+            "browser_download_url": "https://github.com/FriendsOfGalaxy/galaxy-integration-uplay/releases/download/v0.52/windows.zip",
             "name": "windows.zip"
         },
         {
-            "browser_download_url": "https://github.com/FriendsOfGalaxy/galaxy-integration-uplay/releases/download/v0.51/macos.zip",
+            "browser_download_url": "https://github.com/FriendsOfGalaxy/galaxy-integration-uplay/releases/download/v0.52/macos.zip",
             "name": "macos.zip"
         }
     ]

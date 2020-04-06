@@ -63,3 +63,9 @@ class GamesCollection(list):
             raise KeyError(f'No game with id: {key}')
         else:
             raise TypeError(f'Excpected str or int, got {type(key)}')
+
+    def get(self, key):
+        try:
+            return self.__getitem__(key)
+        except (KeyError, TypeError):
+            return None

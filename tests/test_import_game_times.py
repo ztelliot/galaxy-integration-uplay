@@ -130,6 +130,7 @@ async def test_cache(mocker, _patch_plugin):
     # mock
     plugin = _patch_plugin(game_times)
     plugin.client.get_game_stats = AsyncMock(return_value={})
+    plugin.games_collection = MagicMock()
     # import stats first time
     context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
     
@@ -141,10 +142,14 @@ async def test_cache(mocker, _patch_plugin):
     mocker.stopall()
     plugin = _patch_plugin(game_times)
     plugin.client.get_game_stats = AsyncMock(return_value={})
+    plugin.games_collection = MagicMock()
+    plugin.games_collection.get.return_value = None
+    plugin.get_owned_games = AsyncMock()
     # import stats second time
     context = await plugin.prepare_game_times_context([gt.game_id for gt in game_times])
     
     assert context == {
     "121": GameTime(game_id="121", time_played=None, last_played_time=None)
     }
+    plugin.get_owned_games.assert_called()
     

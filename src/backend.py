@@ -7,9 +7,7 @@ import aiohttp
 import asyncio
 import time
 
-from galaxy.api.errors import (
-    AuthenticationRequired, AccessDenied, UnknownError
-)
+from galaxy.api.errors import AuthenticationRequired, AccessDenied, UnknownError
 
 from consts import CLUB_APPID, CHROME_USERAGENT
 
@@ -238,10 +236,8 @@ class BackendClient():
 
     async def get_game_stats(self, space_id):
         url = f"https://public-ubiservices.ubi.com/v1/profiles/{self.user_id}/statscard?spaceId={space_id}"
-        headers = {}
-        headers['Ubi-RequestedPlatformType'] = "uplay"
-        headers['Ubi-LocaleCode'] = "en-GB"
-
+        headers = {'Ubi-RequestedPlatformType': "uplay",
+                   'Ubi-LocaleCode': "en-GB"}
         try:
             j = await self._do_request('get', url, add_to_headers=headers)
         except UnknownError:  # 412: no stats available for this user
@@ -262,18 +258,17 @@ class BackendClient():
         return r.json()
 
     async def post_sessions(self):
-        headers = {}
-        headers['Content-Type'] = 'application/json'
+        headers = {'Content-Type': 'application/json'}
         j = await self._do_request_safe('post', f"https://public-ubiservices.ubi.com/v2/profiles/sessions", add_to_headers=headers)
         return j
 
-    async def get_subscription_titles(self):
+    async def get_subscription(self):
         try:
-            r = await self._do_request('get', f"https://api-uplayplusvault.ubi.com/v1/games?locale=en-US")
-        except AuthenticationRequired:
+            sub_games = await self._do_request('get', f"https://api-uplayplusvault.ubi.com/v1/games")
+        except AccessDenied:
             log.info("Uplay plus Subscription not active")
             return None
-        return r["games"]
+        return sub_games
 
     async def activate_game(self, activation_id):
         r = await self._do_request_safe('post', f"https://api-uplayplusvault.ubi.com/v1/games/activate/{activation_id}")

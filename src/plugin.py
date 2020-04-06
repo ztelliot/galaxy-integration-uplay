@@ -9,12 +9,14 @@ import webbrowser
 import datetime
 import dateutil.parser
 from yaml import scanner
+from typing import Any, List, AsyncGenerator
 
 from galaxy.api.consts import Platform
 from galaxy.api.jsonrpc import ApplicationError
 from galaxy.api.errors import InvalidCredentials, AuthenticationRequired, AccessDenied, UnknownError
 from galaxy.api.plugin import Plugin, create_and_run_plugin
-from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo, GameLibrarySettings
+from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo, GameLibrarySettings, \
+    SubscriptionGame, Subscription, SubscriptionDiscovery
 
 from backend import BackendClient
 from local_client import LocalClient
@@ -29,6 +31,7 @@ from steam import is_steam_installed
 
 if SYSTEM == System.WINDOWS:
     import ctypes
+
 
 class UplayPlugin(Plugin):
     def __init__(self, reader, writer, token):
@@ -96,24 +99,24 @@ class UplayPlugin(Plugin):
 
     async def _parse_subscription_games(self):
         subscription_games = []
-        games = await self.client.get_subscription_titles()
-        if not games:
+        sub_response = await self.client.get_subscription()
+        if not sub_response:
             return
-        for game in games:
+        for game in sub_response['games']:
             subscription_games.append(UbisoftGame(
-                            space_id='',
-                            launch_id=str(game['uplayGameId']),
-                            install_id=str(game['uplayGameId']),
-                            third_party_id='',
-                            name=game['name'],
-                            path='',
-                            type=GameType.New,
-                            special_registry_path='',
-                            exe='',
-                            status=GameStatus.Unknown,
-                            owned=game['ownership'],
-                            activation_id=str(game['id'])
-                        ))
+                space_id='',
+                launch_id=str(game['uplayGameId']),
+                install_id=str(game['uplayGameId']),
+                third_party_id='',
+                name=game['name'],
+                path='',
+                type=GameType.New,
+                special_registry_path='',
+                exe='',
+                status=GameStatus.Unknown,
+                owned=game['ownership'],
+                activation_id=str(game['id'])
+            ))
         self.games_collection.extend(subscription_games)
 
     async def _parse_club_games(self):
@@ -251,6 +254,11 @@ class UplayPlugin(Plugin):
         current_time = int(time.time())
 
         for game_id in game_ids:
+            if not self.games_collection.get(game_id):
+                await self.get_owned_games()
+                break
+
+        for game_id in game_ids:
             try:
                 expire_in = blacklist.get(game_id, 0) - current_time
                 if expire_in > 0:
@@ -298,7 +306,7 @@ class UplayPlugin(Plugin):
         for game in self.games_collection:
             if game.space_id == game_id or game.launch_id == game_id:
                 if not game.space_id:
-                    return[]
+                    return []
                 challenges = await self.client.get_challenges(game.space_id)
                 return [
                     Achievement(achievement_id=challenge["id"], achievement_name=challenge["name"],
@@ -365,7 +373,7 @@ class UplayPlugin(Plugin):
             for game in self.games_collection:
                 game_ids = [game.space_id, game.install_id, game.launch_id]
                 if (game_id in game_ids) and game.owned and game.status in [GameStatus.NotInstalled,
-                                                                                               GameStatus.Unknown]:
+                                                                            GameStatus.Unknown]:
                     if game.install_id:
                         log.info(f"Installing game: {game_id}, {game}")
                         subprocess.Popen(f"start uplay://install/{game.install_id}", shell=True)
@@ -427,7 +435,8 @@ class UplayPlugin(Plugin):
         new_games = []
         for game in self.games_collection:
             try:
-                if statuses[game.install_id] == GameStatus.Installed and game.status in [GameStatus.NotInstalled, GameStatus.Unknown]:
+                if statuses[game.install_id] == GameStatus.Installed and game.status in [GameStatus.NotInstalled,
+                                                                                         GameStatus.Unknown]:
                     log.info(f"updating status for {game.name} to installed from not installed")
                     game.status = GameStatus.Installed
                     self.update_local_game_status(game.as_local_game())
@@ -460,6 +469,22 @@ class UplayPlugin(Plugin):
             FriendInfo(user_id=friend["pid"], user_name=friend["nameOnPlatform"])
             for friend in friends["friends"]
         ]
+
+    async def get_subscriptions(self) -> List[Subscription]:
+        sub_status = await self.client.get_subscription()
+        sub_status = True if sub_status else False
+        return [Subscription(subscription_name="Uplay+", end_time=None, owned=sub_status,
+                             subscription_discovery=SubscriptionDiscovery.AUTOMATIC)]
+
+    async def prepare_subscription_games_context(self, subscription_names: List[str]) -> Any:
+        sub_games_response = await self.client.get_subscription()
+        if sub_games_response:
+            return [SubscriptionGame(game_title=game['name'], game_id=str(game['uplayGameId'])) for game in
+                    sub_games_response["games"]]
+        return None
+
+    async def get_subscription_games(self, subscription_name: str, context: Any) -> AsyncGenerator[List[SubscriptionGame], None]:
+        yield context
 
     if SYSTEM == System.WINDOWS:
         async def launch_platform_client(self):
@@ -513,7 +538,8 @@ class UplayPlugin(Plugin):
                         game = self.games_collection[game_id]
                     except KeyError:
                         continue
-                    library_context[game_id] = {'favorite': game.launch_id in favorite_games, 'hidden': game.launch_id in hidden_games}
+                    library_context[game_id] = {'favorite': game.launch_id in favorite_games,
+                                                'hidden': game.launch_id in hidden_games}
                 return library_context
             return None
 
@@ -526,7 +552,8 @@ class UplayPlugin(Plugin):
             if game_library_settings is None:
                 # Able to retrieve context but game is not in its values -> It doesnt have any tags or hidden status set
                 return GameLibrarySettings(game_id, [], False)
-            return GameLibrarySettings(game_id, ['favorite'] if game_library_settings['favorite'] else [], game_library_settings['hidden'])
+            return GameLibrarySettings(game_id, ['favorite'] if game_library_settings['favorite'] else [],
+                                       game_library_settings['hidden'])
 
     def tick(self):
         loop = asyncio.get_event_loop()
@@ -547,6 +574,7 @@ class UplayPlugin(Plugin):
     async def shutdown(self):
         log.info("Plugin shutdown.")
         await self.client.close()
+
 
 def main():
     multiprocessing.freeze_support()

@@ -114,7 +114,7 @@ class LocalClient(object):
         try:
             stat = os.stat(path)
         except TypeError:
-            log.warning(f'Undecided Ownership file path, uplay client might not be installed')
+            log.warning('Undecided Ownership file path, uplay client might not be installed')
             self.refresh()
         except FileNotFoundError:
             log.warning(f'Ownership file at {path} path not present, user never logged in to uplay client.')

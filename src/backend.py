@@ -109,7 +109,7 @@ class BackendClient():
 
     async def _refresh_auth(self):
         if self.__refresh_in_progress:
-            log.info(f'Refreshing already in progress.')
+            log.info('Refreshing already in progress.')
             while self.__refresh_in_progress:
                 await asyncio.sleep(0.2)
         else:
@@ -129,7 +129,7 @@ class BackendClient():
         await self._do_options_request()
         j = await self._do_request(
             'post',
-            f'https://public-ubiservices.ubi.com/v3/profiles/sessions',
+            'https://public-ubiservices.ubi.com/v3/profiles/sessions',
             headers={
                 'Accept': '*/*',
                 'Accept-Encoding': 'gzip, deflate, br',
@@ -151,7 +151,7 @@ class BackendClient():
         await self._do_options_request()
         j = await self._do_request(
             'put',
-            f'https://public-ubiservices.ubi.com/v3/profiles/sessions',
+            'https://public-ubiservices.ubi.com/v3/profiles/sessions',
             headers={
                 'Accept': '*/*',
                 'Accept-Encoding': 'gzip, deflate, br',
@@ -228,7 +228,7 @@ class BackendClient():
         return await self._do_request_safe('get', f"https://public-ubiservices.ubi.com/v3/users/{self.user_id}")
 
     async def get_friends(self):
-        r = await self._do_request_safe('get', f'https://api-ubiservices.ubi.com/v2/profiles/me/friends')
+        r = await self._do_request_safe('get', 'https://api-ubiservices.ubi.com/v2/profiles/me/friends')
         return r
 
     async def get_club_titles(self):
@@ -254,17 +254,17 @@ class BackendClient():
         return j
 
     async def get_configuration(self):
-        r = await self._do_request_safe('get', f'https://uplaywebcenter.ubi.com/v1/configuration')
+        r = await self._do_request_safe('get', 'https://uplaywebcenter.ubi.com/v1/configuration')
         return r.json()
 
     async def post_sessions(self):
         headers = {'Content-Type': 'application/json'}
-        j = await self._do_request_safe('post', f"https://public-ubiservices.ubi.com/v2/profiles/sessions", add_to_headers=headers)
+        j = await self._do_request_safe('post', "https://public-ubiservices.ubi.com/v2/profiles/sessions", add_to_headers=headers)
         return j
 
     async def get_subscription(self):
         try:
-            sub_games = await self._do_request('get', f"https://api-uplayplusvault.ubi.com/v1/games")
+            sub_games = await self._do_request('get', "https://api-uplayplusvault.ubi.com/v1/games")
         except AccessDenied:
             log.info("Uplay plus Subscription not active")
             return None

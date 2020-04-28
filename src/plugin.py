@@ -341,6 +341,7 @@ class UplayPlugin(Plugin):
                     log.info(f"Launching game '{game.name}' by protocol: [{url}]")
 
                     subprocess.Popen(url, shell=True)
+                    self.reset_tick_count()
                     return
 
             for game in self.games_collection:
@@ -421,10 +422,10 @@ class UplayPlugin(Plugin):
         return True
 
     def open_uplay_client(self):
-        subprocess.Popen(f"start uplay://", shell=True)
+        subprocess.Popen("start uplay://", shell=True)
 
     def open_uplay_browser(self):
-        url = f'https://uplay.ubisoft.com'
+        url = 'https://uplay.ubisoft.com'
         log.info(f"Opening uplay website: {url}")
         webbrowser.open(url, autoraise=True)
 
@@ -491,7 +492,7 @@ class UplayPlugin(Plugin):
             if self.local_client.is_running():
                 log.info("Launch platform client called but Uplay is already running")
                 return
-            url = f"start uplay://"
+            url = "start uplay://"
             subprocess.Popen(url, shell=True)
             # Uplay tries to get focus a couple of times when being launched
             end_time = time.time() + 15
@@ -554,6 +555,10 @@ class UplayPlugin(Plugin):
                 return GameLibrarySettings(game_id, [], False)
             return GameLibrarySettings(game_id, ['favorite'] if game_library_settings['favorite'] else [],
                                        game_library_settings['hidden'])
+
+    def reset_tick_count(self):
+        # Resetting tick count ensures that certain operations performed on tick will be made with a known delay.
+        self.tick_count = 0
 
     def tick(self):
         loop = asyncio.get_event_loop()

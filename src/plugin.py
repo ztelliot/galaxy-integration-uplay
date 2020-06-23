@@ -9,7 +9,8 @@ import webbrowser
 import datetime
 import dateutil.parser
 from yaml import scanner
-from typing import Any, List, AsyncGenerator
+from urllib.parse import unquote
+from typing import Any, List, AsyncGenerator, Optional
 
 from galaxy.api.consts import Platform
 from galaxy.api.jsonrpc import ApplicationError
@@ -22,9 +23,10 @@ from backend import BackendClient
 from local_client import LocalClient
 from local_file_parser import LocalParser
 from local_game_status import ProcessWatcher, GameStatusNotifier
+from local_helper import get_local_game_path, get_size_at_path
 from definitions import GameStatus, UbisoftGame, GameType, System, SYSTEM
 from stats import find_times
-from consts import AUTH_PARAMS, COOKIES
+from consts import AUTH_PARAMS, AUTH_JS
 from games_collection import GamesCollection
 from version import __version__
 from steam import is_steam_installed
@@ -48,12 +50,15 @@ class UplayPlugin(Plugin):
         self.parsing_club_games = False
         self.parsed_local_games = False
 
+
+
     def auth_lost(self):
         self.lost_authentication()
 
     async def authenticate(self, stored_credentials=None):
+
         if not stored_credentials:
-            return NextStep("web_session", AUTH_PARAMS, cookies=COOKIES)
+            return NextStep("web_session", AUTH_PARAMS, js=AUTH_JS)
         else:
             try:
                 user_data = await self.client.authorise_with_stored_credentials(stored_credentials)
@@ -70,7 +75,10 @@ class UplayPlugin(Plugin):
 
     async def pass_login_credentials(self, step, credentials, cookies):
         """Called just after CEF authentication (called as NextStep by authenticate)"""
-        user_data = await self.client.authorise_with_cookies(cookies)
+        url = credentials["end_uri"][len("https://connect.ubisoft.com/change_domain/"):]
+        unquoted_url = unquote(url)
+        storage_jsons = json.loads("[" + unquoted_url + "]")
+        user_data = await self.client.authorise_with_local_storage(storage_jsons)
         self.local_client.initialize(user_data['userId'])
         self.client.set_auth_lost_callback(self.auth_lost)
         return Authentication(user_data['userId'], user_data['username'])
@@ -486,6 +494,19 @@ class UplayPlugin(Plugin):
 
     async def get_subscription_games(self, subscription_name: str, context: Any) -> AsyncGenerator[List[SubscriptionGame], None]:
         yield context
+
+    if SYSTEM == System.WINDOWS:
+        async def prepare_local_size_context(self, game_ids: List[str]) -> Any:
+            local_paths = dict()
+            for game in self.games_collection:
+                for requested_id in game_ids:
+                    if game.launch_id == requested_id or game.space_id == requested_id:
+                        local_paths[requested_id] = get_local_game_path(game.special_registry_path, game.launch_id)
+            return local_paths
+
+        async def get_local_size(self, game_id: str, context: Any) -> Optional[int]:
+            if game_id in context:
+                return await get_size_at_path(context[game_id])
 
     if SYSTEM == System.WINDOWS:
         async def launch_platform_client(self):

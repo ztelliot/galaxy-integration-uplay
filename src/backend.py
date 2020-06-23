@@ -210,14 +210,17 @@ class BackendClient():
         self._plugin.store_credentials(self.get_credentials())
         return user_data
 
-    async def authorise_with_cookies(self, cookies):
+    async def authorise_with_local_storage(self, storage_jsons):
         user_data = {}
-        tasty_cookies = ['user_id', 'user_name', 'ticket', 'rememberMeTicket', 'sessionId']
-        for cookie in cookies:
-            if cookie['name'] in tasty_cookies:
-                user_data[cookie['name']] = cookie['value']
-        user_data['userId'] = user_data.pop('user_id')
-        user_data['username'] = user_data.pop('user_name')
+        tasty_storage_values = ['userId', 'nameOnPlatform', 'ticket', 'rememberMeTicket', 'sessionId']
+        for json in storage_jsons:
+            for key in json:
+                if key in tasty_storage_values:
+                    user_data[key] = json[key]
+
+        user_data['userId'] = user_data.pop('userId')
+        user_data['username'] = user_data.pop('nameOnPlatform')
+
         self.restore_credentials(user_data)
         await self.post_sessions()
         self._plugin.store_credentials(self.get_credentials())

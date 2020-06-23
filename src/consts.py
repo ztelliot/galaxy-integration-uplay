@@ -1,6 +1,6 @@
 import os
 from definitions import System, SYSTEM
-from galaxy.api.types import Cookie
+import re
 UBISOFT_REGISTRY = "SOFTWARE\\Ubisoft"
 STEAM_REGISTRY = "Software\\Valve\\Steam"
 UBISOFT_REGISTRY_LAUNCHER = "SOFTWARE\\Ubisoft\\Launcher"
@@ -19,11 +19,24 @@ AUTH_PARAMS = {
     "window_title": "Login to Uplay",
     "window_width": 400,
     "window_height": 680,
-    "start_uri": f"https://connect.ubi.com/Default/Login?appId={CLUB_APPID}&genomeId={CLUB_GENOME_ID}&nextUrl=https%3A%2F%2Fclub.ubisoft.com",
-    "end_uri_regex": r"^https://club\.ubisoft\.com/.*"
+    "start_uri": f"https://connect.ubisoft.com/login?appId={CLUB_APPID}&genomeId={CLUB_GENOME_ID}&lang=en-US&nextUrl=https:%2F%2Fconnect.ubisoft.com%2Fready",
+    "end_uri_regex": r".*rememberMeTicket.*"
 }
 
-# Adding these cookies disables the cookie disclaimer which blocked major part of the view.
-COOKIES = [Cookie("thirdPartyOk", "ok", ".ubi.com"),
-           Cookie("TC_OPTOUT", "0@@@005@@@ALL", ".ubi.com"),
-           Cookie("TC_OPTOUT_categories", "18%2C19", ".ubi.com")]
+def regex_pattern(regex):
+    return ".*" + re.escape(regex) + ".*"
+
+
+AUTH_JS = {regex_pattern(r"connect.ubisoft.com/ready"): [
+            r'''
+            window.location.replace("https://connect.ubisoft.com/change_domain/"); 
+
+            '''
+        ],
+            regex_pattern(r"connect.ubisoft.com/change_domain"): [
+            r'''
+            window.location.replace(localStorage.getItem("PRODloginData") +","+ localStorage.getItem("PRODrememberMe") +"," + localStorage.getItem("PRODlastProfile"));
+
+            '''
+        ]}
+

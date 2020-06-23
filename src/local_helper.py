@@ -1,6 +1,7 @@
 from definitions import SYSTEM, System, GameStatus
 
 import os
+import asyncio
 import logging as log
 from consts import UBISOFT_REGISTRY_LAUNCHER_INSTALLS
 
@@ -48,6 +49,17 @@ def get_local_game_path(special_registry_path, launch_id):
         local_game_path = _return_local_game_path_from_special_registry(special_registry_path)
     return local_game_path
 
+
+async def get_size_at_path(start_path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+                await asyncio.sleep(0)
+
+    return total_size
 
 def _is_file_at_path(path, file):
     if os.path.isdir(path):

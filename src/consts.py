@@ -16,9 +16,9 @@ CLUB_APPID = "b8fde481-327d-4031-85ce-7c10a202a700"
 CLUB_GENOME_ID = "fbd6791c-a6c6-4206-a75e-77234080b87b"
 
 AUTH_PARAMS = {
-    "window_title": "Login to Uplay",
-    "window_width": 400,
-    "window_height": 680,
+    "window_title": "Login | Ubisoft WebAuth",
+    "window_width": 460,
+    "window_height": 690,
     "start_uri": f"https://connect.ubisoft.com/login?appId={CLUB_APPID}&genomeId={CLUB_GENOME_ID}&lang=en-US&nextUrl=https:%2F%2Fconnect.ubisoft.com%2Fready",
     "end_uri_regex": r".*rememberMeTicket.*"
 }

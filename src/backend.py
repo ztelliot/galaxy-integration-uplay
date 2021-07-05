@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 import logging as log
 from galaxy.http import handle_exception, create_tcp_connector, create_client_session
@@ -23,14 +24,14 @@ class BackendClient():
         self.user_name = None
         self.__refresh_in_progress = False
         connector = create_tcp_connector(limit=30)
-        self._session = create_client_session(connector=connector, timeout=aiohttp.ClientTimeout(total=120), cookie_jar=None)
-
-        self._session.headers = {
+        headers = {
             'Authorization': None,
             'Ubi-AppId': CLUB_APPID,
             "User-Agent": CHROME_USERAGENT,
             'Ubi-SessionId': None
         }
+        self._session = create_client_session(connector=connector, timeout=aiohttp.ClientTimeout(total=120),
+                                              cookie_jar=None, headers=headers)
 
     async def close(self):
         # If closing is attempted while plugin is inside refresh workflow then give it a chance to finish it.
@@ -181,11 +182,10 @@ class BackendClient():
         if data.get('rememberMeTicket'):
             self.refresh_token = data['rememberMeTicket']
 
-        self._session.headers = {
-            'Ubi-AppId': CLUB_APPID,
+        self._session.headers.update({
             "Authorization": f"Ubi_v1 t={self.token}",
             "Ubi-SessionId": self.session_id
-        }
+        })
 
     def get_credentials(self):
         creds = {"ticket": self.token,
@@ -213,10 +213,10 @@ class BackendClient():
     async def authorise_with_local_storage(self, storage_jsons):
         user_data = {}
         tasty_storage_values = ['userId', 'nameOnPlatform', 'ticket', 'rememberMeTicket', 'sessionId']
-        for json in storage_jsons:
-            for key in json:
+        for json_ in storage_jsons:
+            for key in json_:
                 if key in tasty_storage_values:
-                    user_data[key] = json[key]
+                    user_data[key] = json_[key]
 
         user_data['userId'] = user_data.pop('userId')
         user_data['username'] = user_data.pop('nameOnPlatform')
@@ -235,7 +235,46 @@ class BackendClient():
         return r
 
     async def get_club_titles(self):
-        return await self._do_request_safe('get', "https://public-ubiservices.ubi.com/v1/profiles/me/club/aggregation/website/games/owned")
+        payload = {
+            "operationName": "AllGames",
+            "variables": {"owned": True},
+            "query": "query AllGames {"
+                     "viewer {"
+                     "    id"
+                     "    ...ownedGamesList"
+                     "  }"
+                     "}"
+                     "fragment gameProps on Game {"
+                     "  id"
+                     "  spaceId"
+                     "  name"
+                     "}"
+                     "fragment ownedGameProps on Game {"
+                     "  ...gameProps"
+                     "  viewer {"
+                     "    meta {"
+                     "      id"
+                     "      ownedPlatformGroups {"
+                     "        id"
+                     "        name"
+                     "        type"
+                     "      }"
+                     "    }"
+                     "  }"
+                     "}"
+                     "fragment ownedGamesList on User {"
+                     "  ownedGames: games(filterBy: {isOwned: true}) {"
+                     "    totalCount"
+                     "    nodes {"
+                     "      ...ownedGameProps"
+                     "    }"
+                     "  }"
+                     "}"
+        }
+        payload = json.dumps(payload)
+        headers = {'Content-Type': 'application/json'}
+        return await self._do_request_safe('post', "https://public-ubiservices.ubi.com/v3/profiles/me/uplay/graphql",
+                                           add_to_headers=headers, data=payload)
 
     async def get_game_stats(self, space_id):
         url = f"https://public-ubiservices.ubi.com/v1/profiles/{self.user_id}/statscard?spaceId={space_id}"
@@ -250,10 +289,6 @@ class BackendClient():
     async def get_applications(self, spaces):
         space_string = ','.join(space['spaceId'] for space in spaces)
         j = await self._do_request_safe('get', f"https://api-ubiservices.ubi.com/v2/applications?spaceIds={space_string}")
-        return j
-
-    async def get_challenges(self, space_id):
-        j = await self._do_request_safe('get', f"https://public-ubiservices.ubi.com/v1/profiles/{self.user_id}/club/actions?limit=100&locale=en-US&spaceId={space_id}")
         return j
 
     async def get_configuration(self):

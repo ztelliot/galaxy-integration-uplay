@@ -35,10 +35,15 @@ def local_client():
 
 
 @pytest.fixture()
-def create_plugin(local_client):
+def backend_client():
+    return BackendClientMock()
+
+
+@pytest.fixture()
+def create_plugin(local_client, backend_client):
     def function():
         with patch("plugin.LocalClient", return_value=local_client):
-            with patch("plugin.BackendClient", new=BackendClientMock):
+            with patch("plugin.BackendClient", return_value=backend_client):
                 return plugin.UplayPlugin(MagicMock(), MagicMock(), None)
     return function
 

@@ -1,6 +1,10 @@
 import dateutil.parser
+import math
 import logging
 from typing import Tuple, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_last_played(card):
@@ -29,7 +33,7 @@ def _normalize_playtime(card):
     elif unit == 'Miliseconds':
         factor = 60000
     else:
-        logging.warning(f'Playtime: Unexpected unit [{unit}] with value: [{value}]')
+        logger.warning(f'Playtime: Unexpected unit [{unit}] with value: [{value}]')
         return None
 
     if value == "":
@@ -46,6 +50,8 @@ def _get_playtime_heuristics(time_stats):
     """ Tested on most of UplayClub games
     :param time_stats:     cards with format 'longTimestamp'
     """
+    TOTAL_PLAYTIME_DISPLAYNAMES = ['playtime', 'time played', 'play time', 'total play time', 'total playtime']
+
     cards = []
     if len(time_stats) == 0:
         pass
@@ -53,7 +59,7 @@ def _get_playtime_heuristics(time_stats):
         cards = [time_stats[0]]
     else:
         for st in time_stats:
-            if st['displayName'].lower() in ['playtime', 'time played', 'play time']:
+            if st['displayName'].lower() in TOTAL_PLAYTIME_DISPLAYNAMES:
                 cards = [st]
                 break
         else:
@@ -86,7 +92,7 @@ def _get_playtime_heuristics(time_stats):
             time_sum = card_time if time_sum is None else card_time + time_sum
 
     if type(time_sum) == float:
-        time_sum = round(time_sum)
+        time_sum = math.floor(time_sum)
 
     return time_sum
 
@@ -118,11 +124,6 @@ def find_times(statscards: dict, game_id: str = None) -> Tuple[Optional[int], Op
 
     if time_stats:
         playtime = _get_playtime_heuristics(time_stats)
-
-    # +1 hour for forhonor
-    if game_id == '882ad5b5-f549-44a1-a434-c465d22fe4bf':
-        if playtime is not None:
-            playtime += 60
 
     if playtime and playtime <= 0:
         playtime = 0

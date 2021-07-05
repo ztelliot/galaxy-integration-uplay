@@ -6,17 +6,16 @@ import multiprocessing
 import subprocess
 import sys
 import webbrowser
-import datetime
-import dateutil.parser
 from yaml import scanner
 from urllib.parse import unquote
 from typing import Any, List, AsyncGenerator, Optional
 
 from galaxy.api.consts import Platform
 from galaxy.api.jsonrpc import ApplicationError
-from galaxy.api.errors import InvalidCredentials, AuthenticationRequired, AccessDenied, UnknownError
+from galaxy.api.errors import InvalidCredentials, AuthenticationRequired, AccessDenied, UnknownError, \
+    UnknownBackendResponse
 from galaxy.api.plugin import Plugin, create_and_run_plugin
-from galaxy.api.types import Authentication, GameTime, Achievement, NextStep, FriendInfo, GameLibrarySettings, \
+from galaxy.api.types import Authentication, GameTime, NextStep, FriendInfo, GameLibrarySettings, \
     SubscriptionGame, Subscription, SubscriptionDiscovery
 
 from backend import BackendClient
@@ -49,8 +48,6 @@ class UplayPlugin(Plugin):
         self.owned_games_sent = False
         self.parsing_club_games = False
         self.parsed_local_games = False
-
-
 
     def auth_lost(self):
         self.lost_authentication()
@@ -128,33 +125,45 @@ class UplayPlugin(Plugin):
         self.games_collection.extend(subscription_games)
 
     async def _parse_club_games(self):
+        def get_platforms(game):
+            platform_groups = game['viewer']['meta']['ownedPlatformGroups']
+            platforms = []
+            for group in platform_groups:
+                for platform in group:
+                    platforms.append(platform.get('type', ''))
+            return platforms
+
         if not self.parsing_club_games:
             try:
                 self.parsing_club_games = True
-                games = await self.client.get_club_titles()
+                data = await self.client.get_club_titles()
+                games = data['data']['viewer']['ownedGames'].get('nodes', [])
                 club_games = []
                 for game in games:
-                    if "platform" in game:
-                        if game["platform"] == "PC":
-                            log.info(f"Parsed game from Club Request {game['title']}")
-                            club_games.append(
-                                UbisoftGame(
-                                    space_id=game['spaceId'],
-                                    launch_id='',
-                                    install_id='',
-                                    third_party_id='',
-                                    name=game['title'],
-                                    path='',
-                                    type=GameType.New,
-                                    special_registry_path='',
-                                    exe='',
-                                    status=GameStatus.Unknown,
-                                    owned=True
-                                ))
-                        else:
-                            log.debug(f"Skipped game from Club Request for {game['platform']}: {game['spaceId']}, {game['title']}")
+                    platforms = get_platforms(game)
+                    if "PC" in platforms:
+                        log.info(f"Parsed game from Club Request {game['name']}")
+                        club_games.append(
+                            UbisoftGame(
+                                space_id=game['spaceId'],
+                                launch_id='',
+                                install_id='',
+                                third_party_id='',
+                                name=game['name'],
+                                path='',
+                                type=GameType.New,
+                                special_registry_path='',
+                                exe='',
+                                status=GameStatus.Unknown,
+                                owned=True
+                            ))
+                    else:
+                        log.debug(f"Skipped game from Club Request for {platforms}: {game['spaceId']}, {game['name']}")
 
                 self.games_collection.extend(club_games)
+            except (KeyError, TypeError) as e:
+                log.error(f"Unknown response from Ubisoft during parsing club games {repr(e)}")
+                raise UnknownBackendResponse()
             except ApplicationError as e:
                 log.error(f"Encountered exception while parsing club games {repr(e)}")
                 raise e
@@ -306,22 +315,6 @@ class UplayPlugin(Plugin):
         self.persistent_cache['games_without_stats'] = json.dumps(blacklist)
         self.push_cache()
         return games_playtime
-
-    async def get_unlocked_challenges(self, game_id):
-        """Challenges are a unique uplay club feature and don't directly translate to achievements"""
-        if not self.client.is_authenticated():
-            raise AuthenticationRequired()
-        for game in self.games_collection:
-            if game.space_id == game_id or game.launch_id == game_id:
-                if not game.space_id:
-                    return []
-                challenges = await self.client.get_challenges(game.space_id)
-                return [
-                    Achievement(achievement_id=challenge["id"], achievement_name=challenge["name"],
-                                unlock_time=int(
-                                    datetime.datetime.timestamp(dateutil.parser.parse(challenge["completionDate"]))))
-                    for challenge in challenges["actions"] if challenge["isCompleted"] and not challenge["isBadge"]
-                ]
 
     if SYSTEM == System.WINDOWS:
         async def launch_game(self, game_id):

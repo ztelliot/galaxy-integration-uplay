@@ -11,6 +11,7 @@ plugin-uplay.spec
 
 # development stuff
 venv
+.venv
 .DS_Store
 .vscode
 .idea

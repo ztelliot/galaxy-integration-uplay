@@ -65,356 +65,158 @@ class BackendClientMock(AsyncMock):
         return None
 
     async def get_club_titles(self):
-        return [
-            {
-                "spaceId": "6678eff0-1293-4f87-8c8c-06a4ca646068",
-                "installmentSpaceId": "dc9523ee-d85f-412e-bda6-6210ffbf1a2c",
-                "brandSpaceId": "ae9d93e7-bc4e-432a-8097-c1f87da357e7",
-                "applicationId": "697a073a-83f3-46af-9da7-0d0b0a8a2366",
-                "profileId": "1234-edf-ABCD-448f-a18f-09c504b84637",
-                "owned": None,
-                "status": "Active",
-                "platform": "PC",
-                "platforms": None,
-                "releaseDate": "2014-11-13T00:00:00Z",
-                "slug": "assassins-creed-unity",
-                "xp": 1200,
-                "challengesEnabled": False,
-                "communityChallengesEnabled": False,
-                "statsEnabled": False,
-                "lastSessionDate": "2019-05-14T10:58:08.3Z",
-                "title": "Assassin's Creed® Unity",
-                "description": "Assassin’s Creed® Unity tells the story of Arno, a young man who embarks upon an extraordinary journey to expose the True powers behind the French Revolution. In the brand new co-op mode, you and your friends will also be thrown in the middle of a ruthless struggle for the fate of a nation. Rely on communication, coordination, and your diverse skills to become True Master Assassins.",
-                "images": {
-                    "lowThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/ACU/gameImg/gameThumbnail_mobile.jpg",
-                    "highThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/ACU/gameImg/gamePreview.jpg",
-                    "background": "https://ubiservices.cdn.ubi.com/6678eff0-1293-4f87-8c8c-06a4ca646068/applicationCardAsset/ACUc87f.jpg",
-                    "lowLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/ACU/gameImg/hqLogo.png",
-                    "highLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/ACU/gameImg/gameLogo.png",
-                    "lowBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/ACU/gameImg/boxArt_mobile.jpg",
-                    "highBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/ACU/gameImg/boxArt.png"
-                },
-                "friendsPlayingGame": None,
-                "rewardsAvailable": None,
-                "unitsOwned": None,
-                "unitsAvailable": None,
-                "rewardsOwned": None,
-                "badgesAvailable": None,
-                "badgesOwned": None,
-                "rewardCard": None,
-                "classicChallengeCard": None,
-                "weeklyChallengeCard": None,
-                "statsCard": None,
-                "links": {
-                    "betaLink": "",
-                    "storeLink": "https://store.ubi.com/search?q=Assassin's%20Creed®%20Unity",
-                    "websiteLink": "http://assassinscreed.ubi.com/en-GB/games/assassins-creed-unity.aspx",
-                    "facebookLink": "https://www.facebook.com/assassinscreed",
-                    "instagramLink": "",
-                    "twitterLink": "https://twitter.com/assassinscreed",
-                    "supportLink": "https://support.ubi.com/Games/4043",
-                    "twitchLink": "",
-                    "discordLink": "",
-                    "redditLink": "",
-                    "gameplan": "",
-                    "communityCreation": "",
-                    "trailerLink": "",
-                    "samDailyLoginLink": "",
-                    "rewardLink": ""
-                },
-                "gameProgression": None
-            },
-            {
-                "spaceId": "f40e304d-8e8d-4343-8270-d06487c35add",
-                "installmentSpaceId": "3a6baccd-0638-43fa-8fd4-040d11101897",
-                "brandSpaceId": "569be3c6-d299-4967-85e8-9c9cde26fe00",
-                "applicationId": "e0b29a98-ce38-4bc7-96ee-9d20e793e9e3",
-                "profileId": "1234-edf-ABCD-448f-a18f-09c504b84637",
-                "owned": None,
-                "status": "Active",
-                "platform": "PC",
-                "platforms": None,
-                "releaseDate": "2018-03-27T04:00:00Z",
-                "slug": "far-cry-5",
-                "xp": 0,
-                "challengesEnabled": True,
-                "communityChallengesEnabled": True,
-                "statsEnabled": True,
-                "lastSessionDate": "2019-05-13T14:30:46.055Z",
-                "title": "Far Cry® 5",
-                "description": "As the new junior deputy of fictional Hope County, Montana, players will find that their arrival accelerates a years-long silent coup by a fanatical doomsday cult, the Project at Eden's Gate, igniting a violent takeover of the county.",
-                "images": {
-                    "lowThumbnail": "https://ubiservices.cdn.ubi.com/f40e304d-8e8d-4343-8270-d06487c35add/applicationCardAsset/lowThumbnail.jpg",
-                    "highThumbnail": "https://ubiservices.cdn.ubi.com/f40e304d-8e8d-4343-8270-d06487c35add/applicationCardAsset/highThumbnail.jpg",
-                    "background": "https://ubiservices.cdn.ubi.com/f40e304d-8e8d-4343-8270-d06487c35add/applicationCardAsset/FCZa288.jpg",
-                    "lowLogo": "https://ubiservices.cdn.ubi.com/f40e304d-8e8d-4343-8270-d06487c35add/applicationCardAsset/highLogo.png",
-                    "highLogo": "https://ubiservices.cdn.ubi.com/f40e304d-8e8d-4343-8270-d06487c35add/applicationCardAsset/highLogo.png",
-                    "lowBoxArt": "https://ubiservices.cdn.ubi.com/f40e304d-8e8d-4343-8270-d06487c35add/applicationCardAsset/lowBoxArt.jpg",
-                    "highBoxArt": "https://ubiservices.cdn.ubi.com/f40e304d-8e8d-4343-8270-d06487c35add/applicationCardAsset/lowBoxArt.jpg"
-                },
-                "friendsPlayingGame": None,
-                "rewardsAvailable": None,
-                "unitsOwned": None,
-                "unitsAvailable": None,
-                "rewardsOwned": None,
-                "badgesAvailable": None,
-                "badgesOwned": None,
-                "rewardCard": None,
-                "classicChallengeCard": None,
-                "weeklyChallengeCard": None,
-                "statsCard": None,
-                "links": {
-                    "betaLink": "",
-                    "storeLink": "https://store.ubi.com/search?q=Far%20CryÃ‚Â®%205",
-                    "websiteLink": "",
-                    "facebookLink": "",
-                    "instagramLink": "",
-                    "twitterLink": "",
-                    "supportLink": "https://support.ubi.com/en-US/games/2718",
-                    "twitchLink": "",
-                    "discordLink": "",
-                    "redditLink": "",
-                    "gameplan": "",
-                    "communityCreation": "",
-                    "trailerLink": "https://www.youtube.com/watch?v=A7yaYvvP8AM",
-                    "samDailyLoginLink": "https://www.youtube.com/watch?v=na14-9x8Pvk",
-                    "rewardLink": ""
-                },
-                "gameProgression": None
-            },
-            {
-                "spaceId": "6edd234a-abff-4e90-9aab-b9b9c6e49ff7",
-                "installmentSpaceId": "696acbc1-9f79-4284-bcca-1c10b6d0a583",
-                "brandSpaceId": "66d2e728-0dc8-4ae1-825a-f7b3a050f97c",
-                "applicationId": "87843b9b-516d-4a58-824b-f658d1361ad1",
-                "profileId": "1234-edf-ABCD-448f-a18f-09c504b84637",
-                "owned": None,
-                "status": "Active",
-                "platform": "PC",
-                "platforms": None,
-                "releaseDate": "2016-03-08T05:00:00Z",
-                "slug": "tom-clancy-the-division",
-                "xp": 2400,
-                "challengesEnabled": False,
-                "communityChallengesEnabled": False,
-                "statsEnabled": True,
-                "lastSessionDate": "2019-04-12T13:21:16.723Z",
-                "title": "Tom Clancy's The Division™ ",
-                "description": "A devastating pandemic sweeps through New York City, and one by one, basic services fail. In only days, without food or water, society collapses into chaos. The Division, a classified unit of self-supported tactical agents, is activated. Leading seemingly ordinary lives among us, Division agents are trained to operate independently in order to save society. When society falls, your mission begins.",
-                "images": {
-                    "lowThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/TCTD/gameImg/gameThumbnail_mobile.jpg",
-                    "highThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/TCTD/gameImg/gamePreview.jpg",
-                    "background": "https://ubiservices.cdn.ubi.com/6edd234a-abff-4e90-9aab-b9b9c6e49ff7/applicationCardAsset/TCTDeeb9.jpg",
-                    "lowLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/TCTD/gameImg/hqLogo.png",
-                    "highLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/TCTD/gameImg/gameLogo.png",
-                    "lowBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/TCTD/gameImg/boxArt_mobile.jpg",
-                    "highBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/TCTD/gameImg/boxArt.png"
-                },
-                "friendsPlayingGame": None,
-                "rewardsAvailable": None,
-                "unitsOwned": None,
-                "unitsAvailable": None,
-                "rewardsOwned": None,
-                "badgesAvailable": None,
-                "badgesOwned": None,
-                "rewardCard": None,
-                "classicChallengeCard": None,
-                "weeklyChallengeCard": None,
-                "statsCard": None,
-                "links": {
-                    "betaLink": "",
-                    "storeLink": "https://store.ubi.com/search?q=Tom%20Clancy's%20The%20Division",
-                    "websiteLink": "https://tomclancy-thedivision.ubi.com/",
-                    "facebookLink": "https://www.facebook.com/TheDivisionGame",
-                    "instagramLink": "",
-                    "twitterLink": "https://twitter.com/thedivisiongame",
-                    "supportLink": "",
-                    "twitchLink": "https://www.twitch.tv/directory/game/Tom%20Clancy's%20The%20Division",
-                    "discordLink": "",
-                    "redditLink": "",
-                    "gameplan": "",
-                    "communityCreation": "",
-                    "trailerLink": "",
-                    "samDailyLoginLink": "https://www.youtube.com/watch?v=-Tk-ZiAfE5c",
-                    "rewardLink": ""
-                },
-                "gameProgression": None
-            },
-            {
-                "spaceId": "1d1273d9-2120-4e55-8d98-66e08781258e",
-                "installmentSpaceId": "63baa16a-a21d-479b-bc49-b1d5119d0c53",
-                "brandSpaceId": "977babb7-b3dc-4974-b04e-48edb9227e7b",
-                "applicationId": "243b7c00-85dc-4283-81fb-c1deb5430315",
-                "profileId": "1234-edf-ABCD-448f-a18f-09c504b84637",
-                "owned": None,
-                "status": "Active",
-                "platform": "PC",
-                "platforms": None,
-                "releaseDate": "2016-03-22T04:00:00Z",
-                "slug": "trackmania-turbo",
-                "xp": 2400,
-                "challengesEnabled": False,
-                "communityChallengesEnabled": False,
-                "statsEnabled": True,
-                "lastSessionDate": "2019-04-12T13:17:24.005Z",
-                "title": "Trackmania Turbo",
-                "description": "Trackmania offers you the ultimate arcade racing experience where everything is about reaching the perfect racing time. Test your skills in over 200 tracks, experience immediate fun by challenging your friends at home or online. The competition lasts forever: design and share your own tracks with other players in the Trackbuilder!",
-                "images": {
-                    "lowThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/TRA2/gameImg/gameThumbnail_mobile.jpg",
-                    "highThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/TRA2/gameImg/gamePreview.jpg",
-                    "background": "https://ubiservices.cdn.ubi.com/1d1273d9-2120-4e55-8d98-66e08781258e/applicationCardAsset/TRA24836.jpg",
-                    "lowLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/TRA2/gameImg/hqLogo.png",
-                    "highLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/TRA2/gameImg/gameLogo.png",
-                    "lowBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/TRA2/gameImg/boxArt_mobile.jpg",
-                    "highBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/TRA2/gameImg/boxArt.png"
-                },
-                "friendsPlayingGame": None,
-                "rewardsAvailable": None,
-                "unitsOwned": None,
-                "unitsAvailable": None,
-                "rewardsOwned": None,
-                "badgesAvailable": None,
-                "badgesOwned": None,
-                "rewardCard": None,
-                "classicChallengeCard": None,
-                "weeklyChallengeCard": None,
-                "statsCard": None,
-                "links": {
-                    "betaLink": "",
-                    "storeLink": "https://store.ubi.com/search?q=Trackmania%20Turbo",
-                    "websiteLink": "https://www.ubisoft.com/en-GB/game/trackmania-turbo",
-                    "facebookLink": "https://facebook.com/Trackmania/",
-                    "instagramLink": "",
-                    "twitterLink": "https://twitter.com/trackmania",
-                    "supportLink": "https://support.ubi.com/games/5180",
-                    "twitchLink": "https://www.twitch.tv/directory/game/TrackMania%20Turbo",
-                    "discordLink": "",
-                    "redditLink": "",
-                    "gameplan": "",
-                    "communityCreation": "",
-                    "trailerLink": "",
-                    "samDailyLoginLink": "",
-                    "rewardLink": ""
-                },
-                "gameProgression": None
-            },
-            {
-                "spaceId": "50228b8c-bbaa-4c32-83c6-2831a1ac317c",
-                "installmentSpaceId": "1bec5935-a5eb-4618-bfa9-98d597c90e58",
-                "brandSpaceId": "569be3c6-d299-4967-85e8-9c9cde26fe00",
-                "applicationId": "15a42aaf-f5cc-47df-bbb3-f59768ac6eed",
-                "profileId": "1234-edf-ABCD-448f-a18f-09c504b84637",
-                "owned": None,
-                "status": "Active",
-                "platform": "PC",
-                "platforms": None,
-                "releaseDate": "2012-12-04T00:00:00Z",
-                "slug": "far-cry-3",
-                "xp": 1200,
-                "challengesEnabled": False,
-                "communityChallengesEnabled": False,
-                "statsEnabled": False,
-                "lastSessionDate": "0001-01-01T00:00:00",
-                "title": "Far Cry® 3",
-                "description": "Stranded on a lawless island; your only hope of escape is through the muzzle of a gun. Take the fight to the enemy, discover the dark secrets of the island, and outwit a cast of deranged inhabitants. You'll need more than luck to escape alive.",
-                "images": {
-                    "lowThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/FC3/gameImg/gameThumbnail_mobile.jpg",
-                    "highThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/FC3/gameImg/gamePreview.jpg",
-                    "background": "https://ubiservices.cdn.ubi.com/50228b8c-bbaa-4c32-83c6-2831a1ac317c/applicationCardAsset/FC30936.jpg",
-                    "lowLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/FC3/gameImg/hqLogo.png",
-                    "highLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/FC3/gameImg/hqLogo.png",
-                    "lowBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/FC3/gameImg/boxArt_mobile.jpg",
-                    "highBoxArt": None
-                },
-                "friendsPlayingGame": None,
-                "rewardsAvailable": None,
-                "unitsOwned": None,
-                "unitsAvailable": None,
-                "rewardsOwned": None,
-                "badgesAvailable": None,
-                "badgesOwned": None,
-                "rewardCard": None,
-                "classicChallengeCard": None,
-                "weeklyChallengeCard": None,
-                "statsCard": None,
-                "links": {
-                    "betaLink": "",
-                    "storeLink": "https://store.ubi.com/search?q=Far%20Cry®%203",
-                    "websiteLink": "",
-                    "facebookLink": "",
-                    "instagramLink": "",
-                    "twitterLink": "",
-                    "supportLink": "",
-                    "twitchLink": "",
-                    "discordLink": "",
-                    "redditLink": "",
-                    "gameplan": "",
-                    "communityCreation": "",
-                    "trailerLink": "",
-                    "samDailyLoginLink": "",
-                    "rewardLink": ""
-                },
-                "gameProgression": None
-            },
-            {
-                "spaceId": "4bd0476b-acec-446d-b526-23a0209101ca",
-                "installmentSpaceId": "ecc284b5-1722-472c-8d16-686a1ac3eb5f",
-                "brandSpaceId": "569be3c6-d299-4967-85e8-9c9cde26fe00",
-                "applicationId": "4e70f3d3-5d5f-4bd1-8b98-e408b1bbfa0f",
-                "profileId": "1234-edf-ABCD-448f-a18f-09c504b84637",
-                "owned": None,
-                "status": "Active",
-                "platform": "PC",
-                "platforms": None,
-                "releaseDate": "2013-05-01T00:00:00Z",
-                "slug": "far-cry-3-blood-dragon",
-                "xp": 600,
-                "challengesEnabled": False,
-                "communityChallengesEnabled": False,
-                "statsEnabled": False,
-                "lastSessionDate": "0001-01-01T00:00:00",
-                "title": "Far Cry® 3 Blood Dragon",
-                "description": "You are Sergeant Rex Colt: Mark IV Cyber Commando. The year is 2007 and Earth has been ravaged by a nuclear war which erupted in the 90s. The east vs. west conflict has raged for generations, and humanity continues to struggle to progress after a disastrous decade. New paths for peace must be found, and the US cyborg army may have found a solution: a powerful bioweapon on a distant island. Your mission is to gather information and figure out what the hell is going on.",
-                "images": {
-                    "lowThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/FCBD/gameImg/gameThumbnail_mobile.jpg",
-                    "highThumbnail": "https://static8.cdn.ubi.com/u/Uplay/Games/FCBD/gameImg/gamePreview.jpg",
-                    "background": "https://ubiservices.cdn.ubi.com/4bd0476b-acec-446d-b526-23a0209101ca/applicationCardAsset/FCBD236d.jpg",
-                    "lowLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/FCBD/gameImg/logo.jpg",
-                    "highLogo": "https://static8.cdn.ubi.com/u/Uplay/Games/FCBD/gameImg/logo.jpg",
-                    "lowBoxArt": "https://static8.cdn.ubi.com/u/Uplay/Games/FCBD/gameImg/boxArt_mobile.jpg",
-                    "highBoxArt": None
-                },
-                "friendsPlayingGame": None,
-                "rewardsAvailable": None,
-                "unitsOwned": None,
-                "unitsAvailable": None,
-                "rewardsOwned": None,
-                "badgesAvailable": None,
-                "badgesOwned": None,
-                "rewardCard": None,
-                "classicChallengeCard": None,
-                "weeklyChallengeCard": None,
-                "statsCard": None,
-                "links": {
-                    "betaLink": "",
-                    "storeLink": "https://store.ubi.com/search?q=Far%20Cry®%203%20Blood%20Dragon",
-                    "websiteLink": "",
-                    "facebookLink": "",
-                    "instagramLink": "",
-                    "twitterLink": "",
-                    "supportLink": "",
-                    "twitchLink": "",
-                    "discordLink": "",
-                    "redditLink": "",
-                    "gameplan": "",
-                    "communityCreation": "",
-                    "trailerLink": "",
-                    "samDailyLoginLink": "",
-                    "rewardLink": ""
-                },
-                "gameProgression": None
+        return {
+            "data": {
+                "viewer": {
+                  "id": "57a84edf-09d7-448f-a18f-09c504b84637",
+                  "ownedGames": {
+                    "totalCount": 8,
+                    "nodes": [
+                      {
+                        "id": "6678eff0-1293-4f87-8c8c-06a4ca646068",
+                        "spaceId": "6678eff0-1293-4f87-8c8c-06a4ca646068",
+                        "name": "Assassin's Creed\u00ae Unity",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "PC",
+                                  "type": "PC"
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "f40e304d-8e8d-4343-8270-d06487c35add",
+                        "spaceId": "f40e304d-8e8d-4343-8270-d06487c35add",
+                        "name": "Far Cry\u00ae 5",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "PC",
+                                  "type": "PC"
+                                }
+                              ],
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "stadia",
+                                  "type": "STADIA"
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "6edd234a-abff-4e90-9aab-b9b9c6e49ff7",
+                        "spaceId": "6edd234a-abff-4e90-9aab-b9b9c6e49ff7",
+                        "name": "Tom Clancy's The Division\u2122 ",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "PC",
+                                  "type": "PC"
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "1d1273d9-2120-4e55-8d98-66e08781258e",
+                        "spaceId": "1d1273d9-2120-4e55-8d98-66e08781258e",
+                        "name": "Trackmania Turbo",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "PC",
+                                  "type": "PC"
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "50228b8c-bbaa-4c32-83c6-2831a1ac317c",
+                        "spaceId": "50228b8c-bbaa-4c32-83c6-2831a1ac317c",
+                        "name": "Far Cry\u00ae 3",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "PC",
+                                  "type": "PC"
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "4bd0476b-acec-446d-b526-23a0209101ca",
+                        "spaceId": "4bd0476b-acec-446d-b526-23a0209101ca",
+                        "name": "Far Cry\u00ae 3 Blood Dragon",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "PC",
+                                  "type": "PC"
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "4bd0476b-acec-446d-b526-23a0209101ca",
+                        "spaceId": "4bd0476b-acec-446d-b526-23a0209101ca",
+                        "name": "ONLY_STADIA_GAME",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "name": "stadia",
+                                  "type": "STADIA"
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                    ]
+                  }
+                }
             }
-        ]
+        }
 
     def get_applications(self):
         pass

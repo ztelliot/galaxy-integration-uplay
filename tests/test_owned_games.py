@@ -1,10 +1,11 @@
 import asyncio
 import json
-from unittest.mock import patch
 
 import pytest
 from galaxy.api.consts import LicenseType
+from galaxy.api.errors import UnknownBackendResponse
 from galaxy.api.types import Game, LicenseInfo
+from galaxy.unittest.mock import AsyncMock
 
 
 @pytest.fixture
@@ -24,14 +25,81 @@ def test_owned_games_club_only(create_authenticated_plugin, result_owned_club_ga
     loop = asyncio.get_event_loop()
     pg = create_authenticated_plugin()
 
-    pg._game_ownership_is_glitched.return_value = False
-
-    pg.user_can_perform_actions = True
-
-    # do not try parse local games
-    with patch('os.path.exists', lambda _: False):
-        result = loop.run_until_complete(pg.get_owned_games())
+    result = loop.run_until_complete(pg.get_owned_games())
     assert result == result_owned_club_games
 
 
+@pytest.mark.parametrize("response", [
+    {"data": {}},
+    {},
+    "BAD_RESPONSE",
+    None,
+])
+def test_owned_games_club_only_unknown_backend_response(create_authenticated_plugin, backend_client, response):
+    loop = asyncio.get_event_loop()
+    pg = create_authenticated_plugin()
+    backend_client.get_club_titles = AsyncMock(return_value=response)
+
+    with pytest.raises(UnknownBackendResponse):
+        loop.run_until_complete(pg.get_owned_games())
+
+
+@pytest.mark.parametrize("type", [
+    ("PC", "STADIA", "STADIA"),
+    ("STADIA", "PC", "STADIA"),
+    ("STADIA", "STADIA", "PC"),
+])
+def test_owned_games_club_only_with_multi_platform_groups(create_authenticated_plugin, backend_client, type):
+    loop = asyncio.get_event_loop()
+    pg = create_authenticated_plugin()
+    data = {
+            "data": {
+                "viewer": {
+                  "id": "57a84edf-09d7-448f-a18f-09c504b84637",
+                  "ownedGames": {
+                    "totalCount": 8,
+                    "nodes": [
+                      {
+                        "id": "6678eff0-1293-4f87-8c8c-06a4ca646068",
+                        "spaceId": "6678eff0-1293-4f87-8c8c-06a4ca646068",
+                        "name": "Assassin's Creed\u00ae Unity",
+                        "viewer": {
+                          "meta": {
+                            "id": "57a84edf-09d7-448f-a18f-09c504b84637-8c8d9b22-498c-45e6-80da-7cd22787c9b3",
+                            "ownedPlatformGroups": [
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "type": type[0]
+                                },
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "type": type[1]
+                                },
+                              ],
+                              [
+                                {
+                                  "id": "35c5c607-2717-47d9-9323-7df47c6e1c4d",
+                                  "type": type[2]
+                                },
+                              ],
+                            ]
+                          }
+                        }
+                      },
+                    ]
+                  }
+                }
+            }
+        }
+    backend_client.get_club_titles = AsyncMock(return_value=data)
+    expected_result = [Game(
+        "6678eff0-1293-4f87-8c8c-06a4ca646068",
+        "Assassin's Creed\u00ae Unity",
+        [],
+        LicenseInfo(LicenseType.SinglePurchase)
+    )]
+
+    result = loop.run_until_complete(pg.get_owned_games())
+    assert result == expected_result
 

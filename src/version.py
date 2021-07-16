@@ -1,6 +1,9 @@
-__version__ = '0.55.3'
+__version__ = '0.55.4'
 
 __changelog__ = {
+    "0.55.4": """
+        - hotfix fetching club games by replacing version of API endpoint
+    """,
     "0.55.3": """
         - changed login window's title
         - replaced deprecated owned games endpoint

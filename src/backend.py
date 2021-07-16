@@ -273,7 +273,7 @@ class BackendClient():
         }
         payload = json.dumps(payload)
         headers = {'Content-Type': 'application/json'}
-        return await self._do_request_safe('post', "https://public-ubiservices.ubi.com/v3/profiles/me/uplay/graphql",
+        return await self._do_request_safe('post', "https://public-ubiservices.ubi.com/v1/profiles/me/uplay/graphql",
                                            add_to_headers=headers, data=payload)
 
     async def get_game_stats(self, space_id):

@@ -1,6 +1,9 @@
-__version__ = '0.55.4'
+__version__ = '0.55.5'
 
 __changelog__ = {
+    "0.55.5": """
+        - fix parsing club games during fetching owned games; extend logging for unparsable items
+    """,
     "0.55.4": """
         - hotfix fetching club games by replacing version of API endpoint
     """,

@@ -88,7 +88,11 @@ class UplayPlugin(Plugin):
             self._parse_local_games()
             self._parse_local_game_ownership()
 
-        await self._parse_club_games()
+        try:
+            await self._parse_club_games()
+        except Exception as e:
+            log.exception(f"Parsing club games failed: {repr(e)}")
+
         try:
             await self._parse_subscription_games()
         except Exception as e:
@@ -133,6 +137,22 @@ class UplayPlugin(Plugin):
                     platforms.append(platform.get('type', ''))
             return platforms
 
+        def parse_game(game: dict) -> UbisoftGame:
+            log.info(f"Parsed game from Club Request {game['name']}")
+            return UbisoftGame(
+                space_id=game['spaceId'],
+                launch_id='',
+                install_id='',
+                third_party_id='',
+                name=game['name'],
+                path='',
+                type=GameType.New,
+                special_registry_path='',
+                exe='',
+                status=GameStatus.Unknown,
+                owned=True
+            )
+
         if not self.parsing_club_games:
             try:
                 self.parsing_club_games = True
@@ -140,26 +160,15 @@ class UplayPlugin(Plugin):
                 games = data['data']['viewer']['ownedGames'].get('nodes', [])
                 club_games = []
                 for game in games:
-                    platforms = get_platforms(game)
-                    if "PC" in platforms:
-                        log.info(f"Parsed game from Club Request {game['name']}")
-                        club_games.append(
-                            UbisoftGame(
-                                space_id=game['spaceId'],
-                                launch_id='',
-                                install_id='',
-                                third_party_id='',
-                                name=game['name'],
-                                path='',
-                                type=GameType.New,
-                                special_registry_path='',
-                                exe='',
-                                status=GameStatus.Unknown,
-                                owned=True
-                            ))
-                    else:
-                        log.debug(f"Skipped game from Club Request for {platforms}: {game['spaceId']}, {game['name']}")
-
+                    try:
+                        platforms = get_platforms(game)
+                        if "PC" in platforms:
+                            club_games.append(parse_game(game))
+                        else:
+                            log.debug(f"Skipped game from Club Request for {platforms}: {game['spaceId']}, {game['name']}")
+                    except TypeError as e:
+                        log.warning("Raised an error: %s for game: %s" % (e, game))
+                        continue
                 self.games_collection.extend(club_games)
             except (KeyError, TypeError) as e:
                 log.error(f"Unknown response from Ubisoft during parsing club games {repr(e)}")

@@ -12,7 +12,7 @@ if SYSTEM == System.WINDOWS:
 UBISOFT_CONFIGURATIONS_BLACKLISTED_NAMES = ["gamename", "l1", '', 'ubisoft game', 'name']
 
 CHROME_USERAGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36"
-CLUB_APPID = "b314d4fef-e568-454a-ae06-43e3bece12a6"
+CLUB_APPID = "314d4fef-e568-454a-ae06-43e3bece12a6"
 CLUB_GENOME_ID = "85c31714-0941-4876-a18d-2c7e9dce8d40"
 
 AUTH_PARAMS = {

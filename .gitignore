@@ -16,5 +16,6 @@ venv
 .vscode
 .idea
 Pipfile
+*.bak
 # everyone has its own dev.txt to keep own dependencies
 requirements/dev.txt

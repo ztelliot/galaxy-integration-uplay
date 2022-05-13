@@ -52,7 +52,7 @@ jobs:
     - name: Create zip archive
       shell: bash
       env:
-        ZIP_NAME: uplay_afb5a69c-b2ee-4d58-b916-f4cd75d4999a
+        ZIP_NAME: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a
       run: |
         7z a ${ZIP_NAME}.zip ./src/*
         
@@ -67,7 +67,7 @@ jobs:
       uses: actions/upload-artifact@v1
       with:
         name: uplay_win_${{steps.version.outputs.prop}}
-        path: uplay_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
+        path: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
         
     - name: Automatic Releases
       uses: marvinpinto/action-automatic-releases@latest
@@ -81,4 +81,4 @@ jobs:
         # Release title (for automatic releases)
         title: early_release_${{steps.version.outputs.prop}}
         # Assets to upload to the release
-        files: uplay_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
+        files: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip

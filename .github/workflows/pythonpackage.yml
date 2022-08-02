@@ -32,7 +32,7 @@ jobs:
 
     - name: Show build dir
       run: |
-        ls -la ./build
+        ls
 
     - name: Create zip archive
       shell: bash

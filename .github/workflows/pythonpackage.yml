@@ -11,10 +11,16 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: [3.7]
+        os: [macOS-latest, windows-latest]
+        include:  # match Python bitness shipped with Galaxy
+          - os: macOS-latest
+            arch: x64
+          - os: windows-latest
+            arch: x86
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -28,16 +34,14 @@ jobs:
     - name: Build plugin
       uses: GOG-Nebula/action-build-plugin@feat/simple_composite_action
       with:
-        python-arch: 'x86'
+        python-arch: ${{ matrix.arch }}
 
-    - name: Show build dir
-      run: |
-        ls
+    - run: ls
 
     - name: Create zip archive
       shell: bash
       env:
-        ZIP_NAME: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a
+        ZIP_NAME: uplay_${{ matrix.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a
       run: |
         7z a ${ZIP_NAME}.zip ./src/*
 
@@ -51,8 +55,8 @@ jobs:
     - name: Upload result
       uses: actions/upload-artifact@v1
       with:
-        name: uplay_win_${{steps.version.outputs.prop}}
-        path: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
+        name: uplay_${{ matrix.os }}_${{steps.version.outputs.prop}}
+        path: uplay_${{ matrix.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
 
     # - name: Automatic Releases
     #   uses: marvinpinto/action-automatic-releases@latest

@@ -8,8 +8,6 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master, dev ]
-    types:
-      - synchronize
 
 jobs:
   build:
@@ -24,20 +22,17 @@ jobs:
         repository: ${{ github.event.pull_request.head.repo.full_name }}
         ref: ${{ github.event.pull_request.head.ref }}
 
-    - name: Set up Python 3.7
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-        architecture: 'x86' 
-
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
+    
+    - name: Build plugin
+      uses: GOG-Nebula/action-build-plugin@feat/simple_composite_action
+      with:
+        python-arch: 'x86'
 
-    - name: Install dependencies
+    - name: Show build dir
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install -r requirements/app.txt
-        python -m pip install -r requirements/app.txt --target ./src/
+        ls -la ./build
 
     - name: Create zip archive
       shell: bash
@@ -59,16 +54,16 @@ jobs:
         name: uplay_win_${{steps.version.outputs.prop}}
         path: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
 
-    - name: Automatic Releases
-      uses: marvinpinto/action-automatic-releases@latest
-      with:
-        # GitHub secret token
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        # Git tag (for automatic releases)
-        automatic_release_tag: early_release_${{steps.version.outputs.prop}}
-        # Should this release be marked as a pre-release?
-        prerelease: True
-        # Release title (for automatic releases)
-        title: early_release_${{steps.version.outputs.prop}}
-        # Assets to upload to the release
-        files: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
+    # - name: Automatic Releases
+    #   uses: marvinpinto/action-automatic-releases@latest
+    #   with:
+    #     # GitHub secret token
+    #     repo_token: ${{ secrets.GITHUB_TOKEN }}
+    #     # Git tag (for automatic releases)
+    #     automatic_release_tag: early_release_${{steps.version.outputs.prop}}
+    #     # Should this release be marked as a pre-release?
+    #     prerelease: True
+    #     # Release title (for automatic releases)
+    #     title: early_release_${{steps.version.outputs.prop}}
+    #     # Assets to upload to the release
+    #     files: uplay_win_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip

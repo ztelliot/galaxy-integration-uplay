@@ -34,13 +34,13 @@ jobs:
       env:
         ZIP_NAME: uplay_${{ matrix.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a
       run: |
-        7z a ${ZIP_NAME}.zip ./src/*
+        7z a ${ZIP_NAME}.zip ./build/*
 
     - name: get version
       id: version
       uses: notiz-dev/github-action-json-property@release
       with: 
-        path: 'src/manifest.json'
+        path: 'build/manifest.json'
         prop_path: 'version'
   
     - name: Upload result

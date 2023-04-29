@@ -32,7 +32,7 @@ jobs:
     - name: Create zip archive
       shell: bash
       env:
-        ZIP_NAME: uplay_${{ matrix.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a
+        ZIP_NAME: uplay_${{ runner.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a
       run: |
         7z a ${ZIP_NAME}.zip ./build/*
 
@@ -46,8 +46,8 @@ jobs:
     - name: Upload result
       uses: actions/upload-artifact@v1
       with:
-        name: uplay_${{ matrix.os }}_${{steps.version.outputs.prop}}
-        path: uplay_${{ matrix.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
+        name: uplay_${{ runner.os }}_${{steps.version.outputs.prop}}
+        path: uplay_${{ runner.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
 
     # - name: Automatic Releases
     #   uses: marvinpinto/action-automatic-releases@latest

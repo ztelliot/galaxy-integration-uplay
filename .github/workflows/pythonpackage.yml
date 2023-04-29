@@ -28,6 +28,8 @@ jobs:
     
     - name: Build plugin
       uses: GOG-Nebula/action-build-plugin@feat/simple_composite_action
+      with:
+        target: ./build
 
     - name: Create zip archive
       shell: bash
@@ -48,7 +50,7 @@ jobs:
       with:
         name: uplay_${{ runner.os }}_${{steps.version.outputs.prop}}
         path: uplay_${{ runner.os }}_afb5a69c-b2ee-4d58-b916-f4cd75d4999a.zip
-
+    
     # - name: Automatic Releases
     #   uses: marvinpinto/action-automatic-releases@latest
     #   with:

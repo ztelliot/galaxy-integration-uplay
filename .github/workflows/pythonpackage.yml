@@ -31,6 +31,31 @@ jobs:
       with:
         target: ./build
 
+  # TODO - thinks about the flow for release
+  # 
+  # Option 1 (simple) - release job have to be after build job
+  # 1 build job with upload artifacts
+  # 2 release job: 
+  #     - download all artifacts
+  #     - create and publish Github release
+  #
+  # Option 2a (saves resources):
+  # 1. create release job
+  # 2. build job
+  #      - build action (can expose build.zip inside build action)
+  #      - upload directly to previously created release
+  # 3. publish release job
+  # Option 2b -- release job wraps build job so plugin have only build for MR and release for `master` set ups
+  #
+  # Option 3:
+  # - release previously build&tested artifacts (don't build them again)
+  #
+  # release:
+  #   - uses GOG-Nebula/action-release-plugin
+  #     with:
+  #       target-build: ./build
+  #       zip_name: 
+
     - name: Create zip archive
       shell: bash
       env:

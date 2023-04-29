@@ -36,8 +36,6 @@ jobs:
       with:
         python-arch: ${{ matrix.arch }}
 
-    - run: ls
-
     - name: Create zip archive
       shell: bash
       env:
